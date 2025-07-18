@@ -378,6 +378,19 @@ class DatabaseManager {
     `, [templateId]);
   }
 
+  // Additional methods for analytics
+  async runAsync(query, params = []) {
+    return await this.db.runAsync(query, params);
+  }
+
+  async getAllAsync(query, params = []) {
+    return await this.db.getAllAsync(query, params);
+  }
+
+  async getFirstAsync(query, params = []) {
+    return await this.db.getFirstAsync(query, params);
+  }
+
   // Direct database access methods
   async runAsync(query, params = []) {
     return await this.db.runAsync(query, params);

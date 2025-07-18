@@ -76,6 +76,16 @@ const WorkoutScreen = ({ navigation }) => {
     }
   }, [state.restTimer]);
 
+  // Load previous workout data when exercise is expanded
+  useEffect(() => {
+    if (expandedExercise && state.activeWorkout?.exercises) {
+      const exercise = state.activeWorkout.exercises.find(ex => ex.id === expandedExercise);
+      if (exercise && !previousWorkoutData[exercise.exercise_id]) {
+        loadPreviousWorkoutData(exercise.exercise_id);
+      }
+    }
+  }, [expandedExercise, state.activeWorkout?.exercises]);
+
   const loadExercises = async () => {
     try {
       const allExercises = await DatabaseManager.getExercises();
@@ -364,13 +374,6 @@ const WorkoutScreen = ({ navigation }) => {
   const renderExercise = ({ item: exercise }) => {
     const sets = state.exerciseSets[exercise.id] || [];
     const isExpanded = expandedExercise === exercise.id;
-    
-    // Load previous workout data when exercise is expanded
-    useEffect(() => {
-      if (isExpanded && !previousWorkoutData[exercise.exercise_id]) {
-        loadPreviousWorkoutData(exercise.exercise_id);
-      }
-    }, [isExpanded, exercise.exercise_id]);
 
     return (
       <View style={styles.exerciseCard}>
@@ -531,6 +534,8 @@ const WorkoutScreen = ({ navigation }) => {
     </Modal>
   );
 
+
+
   if (!state.activeWorkout) {
     return (
       <View style={styles.noWorkoutContainer}>
@@ -581,8 +586,8 @@ const WorkoutScreen = ({ navigation }) => {
       </ScrollView>
 
       {renderExerciseModal()}
-      {renderWorkoutNotesModal()}
-      {renderPlateCalculatorModal()}
+      {/* Workout Notes Modal - temporarily disabled */}
+      {/* Plate Calculator Modal - temporarily disabled */}
     </SafeAreaView>
   );
 

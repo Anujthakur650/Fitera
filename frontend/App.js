@@ -11,6 +11,7 @@ import { WorkoutProvider } from './contexts/WorkoutContext';
 import HomeScreen from './screens/HomeScreen';
 import WorkoutScreen from './screens/WorkoutScreen';
 import ExercisesScreen from './screens/ExercisesScreen';
+import AnalyticsScreen from './screens/AnalyticsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -29,6 +30,8 @@ function MainTabs() {
             iconName = 'fitness-center';
           } else if (route.name === 'Exercises') {
             iconName = 'list';
+          } else if (route.name === 'Analytics') {
+            iconName = 'analytics';
           } else if (route.name === 'Profile') {
             iconName = 'person';
           }
@@ -49,6 +52,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Workout" component={WorkoutScreen} />
       <Tab.Screen name="Exercises" component={ExercisesScreen} />
+      <Tab.Screen name="Analytics" component={AnalyticsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
