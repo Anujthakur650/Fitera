@@ -1,4 +1,4 @@
-# 💪 StrongClone - Complete Fitness Tracking App
+# 💪 Fitera - Complete Fitness Tracking App
 
 A fully-featured React Native fitness tracking application that perfectly clones the STRONG app experience with all professional features.
 
