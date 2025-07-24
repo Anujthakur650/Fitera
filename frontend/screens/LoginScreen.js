@@ -107,6 +107,15 @@ export default function LoginScreen({ navigation }) {
                 style={styles.loginButton}
               />
 
+              <EnhancedButton
+                title="Forgot Password?"
+                variant="ghost"
+                size="small"
+                onPress={() => navigation.navigate('ForgotPassword')}
+                style={styles.forgotPasswordButton}
+                textStyle={styles.forgotPasswordText}
+              />
+
               <View style={styles.linkContainer}>
                 <Text style={styles.linkText}>Don't have an account? </Text>
                 <EnhancedButton
@@ -207,11 +216,20 @@ flexGrow: 1,
   loginButton: {
     marginTop: THEME.spacing.md,
   },
+  forgotPasswordButton: {
+    marginTop: THEME.spacing.md,
+    alignSelf: 'center',
+  },
+  forgotPasswordText: {
+    color: THEME.colors.primary,
+    fontSize: THEME.typography.fontSize.base,
+    fontWeight: THEME.typography.fontWeight.medium,
+  },
   linkContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: THEME.spacing.lg,
+    marginTop: THEME.spacing.md,
   },
   linkText: {
     fontSize: THEME.typography.fontSize.base,

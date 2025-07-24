@@ -19,6 +19,7 @@ import DatabaseManager from '../utils/database';
 import THEME from '../constants/theme';
 import EnhancedButton from '../components/EnhancedButton';
 import EnhancedCard from '../components/EnhancedCard';
+import { useFocusEffect } from '@react-navigation/native';
 
 const ProfileScreen = () => {
   const { state } = useWorkout();
@@ -58,6 +59,15 @@ const ProfileScreen = () => {
     loadWorkoutStats();
   }, []);
 
+  // Refresh stats when screen gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        loadWorkoutStats();
+      }
+    }, [user?.id])
+  );
+
   const loadUserData = async () => {
     try {
       await DatabaseManager.initDatabase();
@@ -88,7 +98,18 @@ const ProfileScreen = () => {
 
   const loadWorkoutStats = async () => {
     try {
-      const userId = user?.id || 1; // Get current user ID
+      if (!user || !user.id) {
+        console.log('No authenticated user, showing default stats');
+        // Show default/empty stats for unauthenticated users
+        setWorkoutStats({
+          totalWorkouts: 0,
+          totalVolume: 0,
+          personalRecords: 0,
+          averageWorkoutTime: 0
+        });
+        return;
+      }
+      const userId = user.id; // Get current user ID - no fallback
       
       // Get total completed workouts for current user
       const totalWorkouts = await DatabaseManager.getFirstAsync(
@@ -106,7 +127,7 @@ const ProfileScreen = () => {
         [userId]
       );
 
-      // Get personal records count for current user
+      // Get unique exercises performed by current user
       const prResult = await DatabaseManager.getFirstAsync(
         `SELECT COUNT(DISTINCT we.exercise_id) as count 
          FROM sets s 

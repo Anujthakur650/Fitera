@@ -7,6 +7,9 @@ import * as Crypto from 'expo-crypto';
 import ErrorHandler from '../utils/errorHandler';
 import SecurityAudit from '../utils/securityAudit';
 import RateLimiter from '../utils/rateLimiter';
+import { auth } from '../config/firebase';
+import { createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { Alert } from 'react-native';
 
 const AuthContext = createContext({});
 
@@ -336,6 +339,167 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Forgot password with auto-migration to Firebase
+  const forgotPassword = async (email) => {
+    try {
+      console.log('🔑 Starting password reset process for:', email);
+      
+      // First, check if user exists locally
+      await DatabaseManager.initDatabase();
+      const localUsers = await DatabaseManager.getAllAsync(
+        'SELECT * FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
+        [email]
+      );
+      
+      if (localUsers.length > 0) {
+        const localUser = localUsers[0];
+        
+        // Check if user already has Firebase UID (already migrated)
+        if (localUser.firebase_uid) {
+          console.log('✅ User already migrated to Firebase, sending reset email');
+          await sendPasswordResetEmail(auth, email);
+          return { success: true, message: 'Password reset email sent!' };
+        }
+        
+        // User exists locally but not in Firebase - offer migration
+        console.log('🔄 Local user found, needs Firebase migration');
+        
+        return new Promise((resolve) => {
+          Alert.alert(
+            'Account Security Upgrade',
+            'To reset your password, we need to upgrade your account with enhanced security features. This will enable password reset via email and cloud backup for your workouts.\n\nYour existing workout data will be preserved.',
+            [
+              {
+                text: 'Cancel',
+                style: 'cancel',
+                onPress: () => resolve({ 
+                  success: false, 
+                  message: 'Password reset cancelled' 
+                })
+              },
+              {
+                text: 'Upgrade & Reset',
+                style: 'default',
+                onPress: async () => {
+                  try {
+                    // Generate a secure temporary password
+                    const tempPassword = Math.random().toString(36).slice(-8) + 
+                                        Math.random().toString(36).slice(-8).toUpperCase() + 
+                                        '!@#$'[Math.floor(Math.random() * 4)] + 
+                                        Math.floor(Math.random() * 100);
+                    
+                    console.log('🔄 Creating Firebase account for existing user');
+                    
+                    // Create Firebase user
+                    const userCredential = await createUserWithEmailAndPassword(
+                      auth,
+                      email,
+                      tempPassword
+                    );
+                    
+                    const firebaseUser = userCredential.user;
+                    console.log('✅ Firebase account created:', firebaseUser.uid);
+                    
+                    // Link Firebase UID to local user
+                    await DatabaseManager.linkFirebaseUidToExistingUser(
+                      localUser.id,
+                      firebaseUser.uid
+                    );
+                    
+                    console.log('✅ Accounts linked successfully');
+                    
+                    // Send password reset email
+                    await sendPasswordResetEmail(auth, email);
+                    
+                    // Log the migration
+                    await SecurityAudit.logEvent(
+                      SecurityAudit.EVENT_TYPES.USER_MIGRATED,
+                      { 
+                        userId: localUser.id, 
+                        email: email,
+                        firebaseUid: firebaseUser.uid 
+                      },
+                      true,
+                      'MEDIUM'
+                    );
+                    
+                    Alert.alert(
+                      'Success!',
+                      'Your account has been upgraded. Please check your email for password reset instructions.\n\nAll your workout data has been preserved.',
+                      [{ text: 'OK' }]
+                    );
+                    
+                    resolve({ 
+                      success: true, 
+                      message: 'Account upgraded and password reset email sent!' 
+                    });
+                  } catch (error) {
+                    console.error('❌ Migration error:', error);
+                    
+                    let errorMessage = 'Failed to upgrade account. ';
+                    if (error.code === 'auth/email-already-in-use') {
+                      // Firebase account already exists, just send reset email
+                      console.log('🔄 Firebase account already exists, sending reset email directly');
+                      try {
+                        await sendPasswordResetEmail(auth, email);
+                        Alert.alert(
+                          'Password Reset Email Sent',
+                          'A Firebase account already exists for this email. We\'ve sent you a password reset link. Please check your email.',
+                          [{ text: 'OK' }]
+                        );
+                        resolve({ 
+                          success: true, 
+                          message: 'Password reset email sent to existing Firebase account!' 
+                        });
+                        return;
+                      } catch (resetError) {
+                        console.error('❌ Failed to send reset email:', resetError);
+                        errorMessage = 'Failed to send password reset email. Please try again.';
+                      }
+                    } else if (error.code === 'auth/weak-password') {
+                      errorMessage = 'Security upgrade failed. Please try again.';
+                    } else if (error.code === 'auth/network-request-failed') {
+                      errorMessage = 'Network error. Please check your connection and try again.';
+                    }
+                    
+                    Alert.alert('Error', errorMessage);
+                    resolve({ success: false, message: errorMessage });
+                  }
+                }
+              }
+            ]
+          );
+        });
+      } else {
+        // User doesn't exist locally, try Firebase directly
+        console.log('🔍 No local user found, trying Firebase');
+        try {
+          await sendPasswordResetEmail(auth, email);
+          return { success: true, message: 'Password reset email sent!' };
+        } catch (error) {
+          console.error('❌ Firebase password reset error:', error);
+          
+          let errorMessage = 'Failed to send reset email.';
+          if (error.code === 'auth/user-not-found') {
+            errorMessage = 'No account found with this email address.';
+          } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Please enter a valid email address.';
+          } else if (error.code === 'auth/too-many-requests') {
+            errorMessage = 'Too many attempts. Please try again later.';
+          }
+          
+          return { success: false, message: errorMessage };
+        }
+      }
+    } catch (error) {
+      console.error('❌ Forgot password error:', error);
+      return { 
+        success: false, 
+        message: 'An error occurred. Please try again.' 
+      };
+    }
+  };
+
   // Debug function to check database contents
   const debugDatabase = async () => {
     try {
@@ -370,6 +534,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    forgotPassword, // Add forgot password method
     debugDatabase // Add debug function
   };
 

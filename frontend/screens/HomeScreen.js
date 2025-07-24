@@ -55,13 +55,13 @@ const HomeScreen = ({ navigation }) => {
     checkIfNewUser();
   }, [user]);
 
-  // Refresh data when screen comes into focus (but not on initial mount)
+  // Refresh data when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       let isActive = true;
       
-      // Only refresh if component is already mounted and initialized
-      if (state.dbInitialized && user && !isLoading) {
+      // Always refresh when screen gains focus if database is initialized
+      if (state.dbInitialized && user) {
         loadDashboardData();
       }
       
@@ -72,15 +72,25 @@ const HomeScreen = ({ navigation }) => {
   );
 
   const loadDashboardData = async () => {
-    if (!state.dbInitialized || !user) return;
+    if (!state.dbInitialized || !user || !user.id) {
+      console.log('No authenticated user, skipping dashboard data load');
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const userId = user.id || 1; // Get current user ID
+      const userId = user.id; // Get current user ID - no fallback
       
       // Load recent workouts for current user
       const recent = await DatabaseManager.getRecentWorkouts(userId, 5);
       setRecentWorkouts(recent);
+      
+      // Debug: Log recent workouts data
+      console.log(`HomeScreen - Recent workouts loaded: ${recent.length}`);
+      recent.forEach((w, i) => {
+        console.log(`  ${i + 1}. ${w.name} - Exercises: ${w.exercise_count}, Sets: ${w.set_count}`);
+      });
 
       // Load workout templates
       const templates = await DatabaseManager.getWorkoutTemplates();

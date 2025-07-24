@@ -251,13 +251,40 @@ class DatabaseManager {
   async migrateToUserAssociation() {
     try {
       // Check if password column exists in users table
-      const usersTableInfo = await this.db.getAllAsync("PRAGMA table_info(users)");
+      let usersTableInfo = await this.db.getAllAsync("PRAGMA table_info(users)");
       const hasPasswordColumn = usersTableInfo.some(column => column.name === 'password');
       
       if (!hasPasswordColumn) {
         console.log('Adding password column to users table...');
         await this.db.execAsync('ALTER TABLE users ADD COLUMN password TEXT');
         console.log('Password column added to users table');
+      }
+      
+      // Re-fetch table info after potential password column addition
+      usersTableInfo = await this.db.getAllAsync("PRAGMA table_info(users)");
+      
+      // Check if firebase_uid column exists in users table
+      const hasFirebaseUidColumn = usersTableInfo.some(column => column.name === 'firebase_uid');
+      
+      if (!hasFirebaseUidColumn) {
+        console.log('Adding firebase_uid column to users table...');
+        try {
+          await this.db.execAsync('ALTER TABLE users ADD COLUMN firebase_uid TEXT UNIQUE');
+          await this.db.execAsync('CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)');
+          console.log('Firebase UID column added to users table');
+        } catch (error) {
+          // If UNIQUE constraint fails, try without it first
+          console.log('Trying to add firebase_uid column without UNIQUE constraint...');
+          await this.db.execAsync('ALTER TABLE users ADD COLUMN firebase_uid TEXT');
+          // Then try to add unique index separately
+          try {
+            await this.db.execAsync('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)');
+          } catch (indexError) {
+            console.log('Could not create unique index, creating regular index instead');
+            await this.db.execAsync('CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid)');
+          }
+          console.log('Firebase UID column added to users table');
+        }
       }
 
       // Check if user_id column already exists in workouts table
@@ -523,7 +550,7 @@ class DatabaseManager {
 
   async getWorkoutHistory(userId, limit = 50) {
     try {
-      // Get workouts with exercise and set counts to filter out empty workouts
+      // Get all completed workouts, including those without exercises
       const workouts = await this.db.getAllAsync(`
         SELECT 
           w.id,
@@ -535,15 +562,14 @@ class DatabaseManager {
           w.user_id,
           COUNT(DISTINCT we.id) as exercise_count,
           COUNT(DISTINCT s.id) as set_count,
-          COALESCE(SUM(s.weight * s.reps), 0) as total_volume
+          COALESCE(SUM(CASE WHEN s.is_completed = 1 THEN s.weight * s.reps ELSE 0 END), 0) as total_volume
         FROM workouts w
-        INNER JOIN workout_exercises we ON w.id = we.workout_id
-        INNER JOIN sets s ON we.id = s.workout_exercise_id AND s.is_completed = 1
+        LEFT JOIN workout_exercises we ON w.id = we.workout_id
+        LEFT JOIN sets s ON we.id = s.workout_exercise_id
         WHERE w.is_completed = 1 
           AND w.user_id = ? 
           AND w.duration > 0
         GROUP BY w.id, w.name, w.date, w.duration, w.notes, w.is_completed, w.user_id
-        HAVING exercise_count > 0 AND set_count > 0
         ORDER BY w.date DESC, w.id DESC
         LIMIT ?
       `, [userId, limit]);
@@ -557,7 +583,7 @@ class DatabaseManager {
 
   async getRecentWorkouts(userId, limit = 5) {
     try {
-      // Get recent workouts with same criteria as getWorkoutHistory to ensure consistency
+      // Get recent workouts, including those without exercises
       const workouts = await this.db.getAllAsync(`
         SELECT 
           w.id,
@@ -569,15 +595,14 @@ class DatabaseManager {
           w.user_id,
           COUNT(DISTINCT we.id) as exercise_count,
           COUNT(DISTINCT s.id) as set_count,
-          COALESCE(SUM(s.weight * s.reps), 0) as total_volume
+          COALESCE(SUM(CASE WHEN s.is_completed = 1 THEN s.weight * s.reps ELSE 0 END), 0) as total_volume
         FROM workouts w
-        INNER JOIN workout_exercises we ON w.id = we.workout_id
-        INNER JOIN sets s ON we.id = s.workout_exercise_id AND s.is_completed = 1
+        LEFT JOIN workout_exercises we ON w.id = we.workout_id
+        LEFT JOIN sets s ON we.id = s.workout_exercise_id
         WHERE w.is_completed = 1 
           AND w.user_id = ? 
           AND w.duration > 0
         GROUP BY w.id, w.name, w.date, w.duration, w.notes, w.is_completed, w.user_id
-        HAVING exercise_count > 0 AND set_count > 0
         ORDER BY w.date DESC, w.id DESC
         LIMIT ?
       `, [userId, limit]);
@@ -806,6 +831,90 @@ class DatabaseManager {
     } catch (error) {
       console.error('Error checking if user is new:', error);
       return true; // Default to new user if error
+    }
+  }
+  
+  // Firebase synchronization methods
+  async getUserByFirebaseUid(firebaseUid) {
+    try {
+      return await this.db.getFirstAsync(
+        'SELECT * FROM users WHERE firebase_uid = ?',
+        [firebaseUid]
+      );
+    } catch (error) {
+      console.error('Error getting user by Firebase UID:', error);
+      return null;
+    }
+  }
+  
+  async createOrUpdateFirebaseUser(firebaseUser) {
+    try {
+      // Check if user exists by Firebase UID
+      const existingUser = await this.getUserByFirebaseUid(firebaseUser.uid);
+      
+      if (existingUser) {
+        // Update existing user
+        await this.db.runAsync(
+          'UPDATE users SET name = ?, email = ? WHERE firebase_uid = ?',
+          [firebaseUser.displayName || firebaseUser.email?.split('@')[0], firebaseUser.email, firebaseUser.uid]
+        );
+        return existingUser.id;
+      } else {
+        // Create new user
+        const result = await this.db.runAsync(
+          'INSERT INTO users (name, email, firebase_uid, created_at) VALUES (?, ?, ?, ?)',
+          [firebaseUser.displayName || firebaseUser.email?.split('@')[0], firebaseUser.email, firebaseUser.uid, new Date().toISOString()]
+        );
+        return result.lastInsertRowId;
+      }
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'Database', action: 'createOrUpdateFirebaseUser' }, 'HIGH');
+      throw error;
+    }
+  }
+  
+  async linkFirebaseUidToExistingUser(userId, firebaseUid) {
+    try {
+      // Check if another user already has this Firebase UID
+      const existingFirebaseUser = await this.getUserByFirebaseUid(firebaseUid);
+      if (existingFirebaseUser && existingFirebaseUser.id !== userId) {
+        throw new Error('Firebase UID already linked to another user');
+      }
+      
+      // Link Firebase UID to existing user
+      await this.db.runAsync(
+        'UPDATE users SET firebase_uid = ? WHERE id = ?',
+        [firebaseUid, userId]
+      );
+      
+      console.log(`✅ Linked Firebase UID ${firebaseUid} to user ${userId}`);
+      return true;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'Database', action: 'linkFirebaseUidToExistingUser' }, 'HIGH');
+      throw error;
+    }
+  }
+  
+  // Helper method to get user ID consistently
+  async getUserIdForAuth(authUser) {
+    try {
+      if (!authUser) return null;
+      
+      // If it's a Firebase user (has uid property)
+      if (authUser.uid) {
+        const dbUser = await this.getUserByFirebaseUid(authUser.uid);
+        return dbUser?.id || null;
+      }
+      
+      // If it's a local user (has id property)
+      if (authUser.id) {
+        return authUser.id;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting user ID for auth:', error);
+      return null;
     }
   }
 }

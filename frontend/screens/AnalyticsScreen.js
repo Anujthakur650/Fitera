@@ -14,12 +14,15 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useWorkout } from '../contexts/WorkoutContext';
+import { useAuth } from '../contexts/AuthContext';
 import AnalyticsEngine from '../utils/analyticsEngine';
+// Removed DataDebugComponent for production
 
 const { width } = Dimensions.get('window');
 
 const AnalyticsScreen = () => {
   const { state } = useWorkout();
+  const { user } = useAuth();
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -35,15 +38,19 @@ const AnalyticsScreen = () => {
   ];
 
   useEffect(() => {
-    if (state.dbInitialized) {
+    if (state.dbInitialized && user?.id) {
       loadAnalytics();
     }
-  }, [state.dbInitialized, selectedTimeframe]);
+  }, [state.dbInitialized, selectedTimeframe, user?.id]);
 
   const loadAnalytics = async () => {
     try {
+      if (!user?.id) {
+        console.log('No user ID available for analytics');
+        return;
+      }
       setLoading(true);
-      const analyticsData = await AnalyticsEngine.getComprehensiveAnalytics(selectedTimeframe);
+      const analyticsData = await AnalyticsEngine.getComprehensiveAnalytics(user.id, selectedTimeframe);
       setAnalytics(analyticsData);
     } catch (error) {
       console.error('Error loading analytics:', error);

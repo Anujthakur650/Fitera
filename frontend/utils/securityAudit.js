@@ -27,6 +27,7 @@ class SecurityAudit {
     LOGOUT: 'LOGOUT',
     SESSION_EXPIRED: 'SESSION_EXPIRED',
     PASSWORD_CHANGE: 'PASSWORD_CHANGE',
+    USER_MIGRATED: 'USER_MIGRATED',
     
     // Authorization events
     ACCESS_GRANTED: 'ACCESS_GRANTED',

@@ -5,6 +5,14 @@ const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
 
+// Helper function to generate password reset link
+const generatePasswordResetLink = (token) => {
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://fitera.app' 
+    : 'http://localhost:3000';
+  return `${baseUrl}/reset-password/${token}`;
+};
+
 // @route   POST /api/auth/register
 // @desc    Register a new user
 // @access  Public
@@ -148,6 +156,94 @@ router.post('/login', [
       success: false,
       message: 'Login failed. Please try again later.',
       code: 'OPERATION_FAILED'
+    });
+  }
+});
+// @route   POST /api/auth/forgot-password
+// @desc    Initiate password reset
+// @access  Public
+router.post('/forgot-password', [
+  body('email').isEmail().normalizeEmail().withMessage('Invalid email')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const userErrors = errors.array().map(err => ({
+        field: err.param,
+        message: err.msg
+      }));
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: userErrors
+      });
+    }
+
+    const { email } = req.body;
+    
+    // For demo/testing purposes when DB is not available
+    // In production, you would check if the user exists in the database
+    console.log(`Password reset requested for: ${email}`);
+    
+    // Generate mock reset token
+    const resetToken = 'mock-reset-token-' + Date.now();
+    
+    // Log the reset link (in production, this would be sent via email)
+    console.log(`Password reset link: ${generatePasswordResetLink(resetToken)}`);
+
+    // Always return success to prevent email enumeration
+    res.json({
+      success: true,
+      message: 'If an account exists with this email, you will receive password reset instructions.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Request failed. Please try again later.'
+    });
+  }
+});
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password with token
+// @access  Public
+router.post('/reset-password', [
+  body('token').notEmpty().withMessage('Token is required'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+
+    const { token, password } = req.body;
+    const user = await User.findOne({ resetPasswordToken: token });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+    // Update user password
+    user.password = bcrypt.hashSync(password, 10);
+    user.resetPasswordToken = undefined;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password reset successful'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Request failed. Please try again later.'
     });
   }
 });

@@ -56,11 +56,15 @@ const WorkoutHistoryScreen = ({ navigation }) => {
   };
 
   const loadWorkouts = async () => {
-    if (!user) return;
+    if (!user || !user.id) {
+      console.log('No authenticated user, skipping workout history load');
+      setLoading(false);
+      return;
+    }
     
     try {
       setLoading(true);
-      const userId = user.id || 1;
+      const userId = user.id;
       
       // Load all workouts with exercises and sets (now filtered at database level)
       const allWorkouts = await DatabaseManager.getWorkoutHistory(userId, 1000);
@@ -108,13 +112,13 @@ const WorkoutHistoryScreen = ({ navigation }) => {
         return parseSQLiteDate(b.date) - parseSQLiteDate(a.date);
       });
       
-      console.log(`Loaded ${allWorkouts.length} total workouts, showing ${sortedWorkouts.length} for filter: ${selectedFilter}`);
+      console.log(`WorkoutHistory - Loaded ${allWorkouts.length} total workouts, showing ${sortedWorkouts.length} for filter: ${selectedFilter}`);
       
-      // Debug: Log workout dates to check for duplicates or time issues
+      // Debug: Log workout details including exercise and set counts
       if (__DEV__) {
-        console.log('Workout dates:');
+        console.log('WorkoutHistory - Workout details:');
         sortedWorkouts.slice(0, 10).forEach(w => {
-          console.log(`- ${w.name}: ${w.date} (${formatDate(w.date)})`);
+          console.log(`- ${w.name}: ${w.date} (${formatDate(w.date)}) - Exercises: ${w.exercise_count}, Sets: ${w.set_count}`);
         });
       }
       

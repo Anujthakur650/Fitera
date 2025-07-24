@@ -21,7 +21,7 @@ class AnalyticsEngine {
   }
 
   // ===== MUSCLE GROUP BALANCE ANALYSIS =====
-  async getMuscleGroupBalance(timeframe = 30) {
+  async getMuscleGroupBalance(userId, timeframe = 30) {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - timeframe);
@@ -41,13 +41,14 @@ class AnalyticsEngine {
         JOIN exercises e ON we.exercise_id = e.id
         JOIN exercise_categories c ON e.category_id = c.id
         WHERE w.is_completed = 1 
+          AND w.user_id = ?
           AND w.date >= ?
           AND s.is_completed = 1
         GROUP BY e.category_id, c.name
         ORDER BY total_volume DESC
       `;
 
-      const results = await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString()]);
+      const results = await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString()]);
       
       if (results.length === 0) {
         return {
@@ -145,7 +146,7 @@ class AnalyticsEngine {
   }
 
   // ===== PROGRESSION TREND ANALYSIS =====
-  async getProgressionTrends(exerciseId, timeframe = 90) {
+  async getProgressionTrends(exerciseId, userId, timeframe = 90) {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - timeframe);
@@ -163,6 +164,7 @@ class AnalyticsEngine {
         JOIN workout_exercises we ON s.workout_exercise_id = we.id
         JOIN workouts w ON we.workout_id = w.id
         WHERE we.exercise_id = ?
+          AND w.user_id = ?
           AND w.is_completed = 1
           AND w.date >= ?
           AND s.is_completed = 1
@@ -170,7 +172,7 @@ class AnalyticsEngine {
         ORDER BY w.date ASC, s.set_number ASC
       `;
 
-      const allSets = await DatabaseManager.getAllAsync(query, [exerciseId, cutoffDate.toISOString()]);
+      const allSets = await DatabaseManager.getAllAsync(query, [exerciseId, userId, cutoffDate.toISOString()]);
       
       if (allSets.length === 0) {
         return {
@@ -303,14 +305,14 @@ class AnalyticsEngine {
   }
 
   // ===== STRENGTH RATIO ANALYSIS =====
-  async getStrengthRatios() {
+  async getStrengthRatios(userId) {
     try {
       const ratioAnalysis = [];
 
       for (const [ratioName, config] of Object.entries(this.strengthRatios)) {
-        const primaryMax = await this.getExerciseMax(config.primary);
+        const primaryMax = await this.getExerciseMax(config.primary, userId);
         const secondaryMaxes = await Promise.all(
-          config.secondary.map(exercise => this.getExerciseMax(exercise))
+          config.secondary.map(exercise => this.getExerciseMax(exercise, userId))
         );
         
         const secondaryMax = Math.max(...secondaryMaxes.filter(max => max > 0));
@@ -346,7 +348,7 @@ class AnalyticsEngine {
     }
   }
 
-  async getExerciseMax(exerciseName) {
+  async getExerciseMax(exerciseName, userId) {
     try {
       const query = `
         SELECT MAX(s.weight * (1 + s.reps / 30)) as estimated_1rm
@@ -355,6 +357,7 @@ class AnalyticsEngine {
         JOIN exercises e ON we.exercise_id = e.id
         JOIN workouts w ON we.workout_id = w.id
         WHERE e.name LIKE ?
+          AND w.user_id = ?
           AND w.is_completed = 1
           AND s.is_completed = 1
           AND s.is_warmup = 0
@@ -362,7 +365,7 @@ class AnalyticsEngine {
           AND s.weight > 0
       `;
 
-      const result = await DatabaseManager.getFirstAsync(query, [`%${exerciseName}%`]);
+      const result = await DatabaseManager.getFirstAsync(query, [`%${exerciseName}%`, userId]);
       return Math.round(result?.estimated_1rm || 0);
     } catch (error) {
       console.error(`Error getting max for ${exerciseName}:`, error);
@@ -415,7 +418,7 @@ class AnalyticsEngine {
   }
 
   // ===== VOLUME DISTRIBUTION ANALYSIS =====
-  async getVolumeDistribution(timeframe = 30) {
+  async getVolumeDistribution(userId, timeframe = 30) {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - timeframe);
@@ -435,6 +438,7 @@ class AnalyticsEngine {
         JOIN exercises e ON we.exercise_id = e.id
         JOIN exercise_categories c ON e.category_id = c.id
         WHERE w.is_completed = 1 
+          AND w.user_id = ?
           AND w.date >= ?
           AND s.is_completed = 1
           AND s.is_warmup = 0
@@ -442,7 +446,7 @@ class AnalyticsEngine {
         ORDER BY w.date DESC
       `;
 
-      const data = await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString()]);
+      const data = await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString()]);
       
       // Group by week for analysis
       const weeklyVolume = this.groupVolumeByWeek(data);
@@ -575,7 +579,7 @@ class AnalyticsEngine {
   }
 
   // ===== PERSONAL RECORDS TRACKING =====
-  async getPersonalRecords(limit = 10) {
+  async getPersonalRecords(userId, limit = 10) {
     try {
       const query = `
         SELECT 
@@ -593,6 +597,7 @@ class AnalyticsEngine {
         JOIN exercises e ON we.exercise_id = e.id
         JOIN exercise_categories c ON e.category_id = c.id
         WHERE w.is_completed = 1
+          AND w.user_id = ?
           AND s.is_completed = 1
           AND s.is_warmup = 0
           AND s.weight > 0
@@ -602,7 +607,7 @@ class AnalyticsEngine {
         LIMIT ?
       `;
 
-      const records = await DatabaseManager.getAllAsync(query, [limit]);
+      const records = await DatabaseManager.getAllAsync(query, [userId, limit]);
       
       return records.map(record => ({
         exercise: record.exercise_name,

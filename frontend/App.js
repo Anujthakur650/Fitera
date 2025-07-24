@@ -25,6 +25,10 @@ import WorkoutHistoryScreen from './screens/WorkoutHistoryScreen';
 import WelcomeScreen from './screens/WelcomeScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
+import ForgotPasswordEmailScreen from './screens/ForgotPasswordEmailScreen';
+import ForgotPasswordSentScreen from './screens/ForgotPasswordSentScreen';
+import ResetPasswordScreen from './screens/ResetPasswordScreen';
+import PasswordResetSuccessScreen from './screens/PasswordResetSuccessScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -36,6 +40,10 @@ function AuthNavigator() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordEmailScreen} />
+      <Stack.Screen name="ForgotPasswordSent" component={ForgotPasswordSentScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <Stack.Screen name="PasswordResetSuccess" component={PasswordResetSuccessScreen} />
     </Stack.Navigator>
   );
 }

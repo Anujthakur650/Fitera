@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import DatabaseManager from '../utils/database';
 import { useAuth } from './AuthContext';
 
@@ -178,7 +179,11 @@ export const WorkoutProvider = ({ children }) => {
 
   // Helper to get current user ID
   const getCurrentUserId = () => {
-    return user?.id || 1; // Fallback to 1 for backward compatibility
+    if (!user || !user.id) {
+      console.warn('⚠️ No authenticated user found for workout operations');
+      return null;
+    }
+    return user.id; // Always use the SQLite ID for local data operations
   };
 
   // Initialize database on app start
@@ -252,8 +257,15 @@ export const WorkoutProvider = ({ children }) => {
 
   const startWorkout = async (name, templateId = null) => {
     try {
+      const userId = getCurrentUserId();
+      if (!userId) {
+        console.error('Cannot start workout without authenticated user');
+        Alert.alert('Error', 'Please log in to start a workout');
+        return null;
+      }
+      
       const startTime = new Date().toISOString();
-      const workoutId = await DatabaseManager.createWorkout(name, templateId, auth.user.id);
+      const workoutId = await DatabaseManager.createWorkout(name, templateId, userId);
       const newWorkout = { id: workoutId, name, date: startTime };
 
       let exercises = [];
