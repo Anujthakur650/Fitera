@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Dimensions,
   StatusBar
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWorkout } from '../contexts/WorkoutContext';
@@ -21,7 +22,6 @@ import { formatDate } from '../utils/dateUtils';
 import { formatDateShort, formatWorkoutDate, getRelativeTime } from '../utils/dateFormatter';
 import THEME from '../constants/theme';
 import EnhancedButton from '../components/EnhancedButton';
-
 import EnhancedCard from '../components/EnhancedCard';
 
 const { width } = Dimensions.get('window');
@@ -44,15 +44,32 @@ const HomeScreen = ({ navigation }) => {
   const [error, setError] = useState(null);
   
 
+  // Initial load when component mounts and dependencies change
   useEffect(() => {
-    loadDashboardData();
+    if (state.dbInitialized && user) {
+      loadDashboardData();
+    }
   }, [state.dbInitialized, user]);
 
   useEffect(() => {
     checkIfNewUser();
   }, [user]);
 
-
+  // Refresh data when screen comes into focus (but not on initial mount)
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      
+      // Only refresh if component is already mounted and initialized
+      if (state.dbInitialized && user && !isLoading) {
+        loadDashboardData();
+      }
+      
+      return () => {
+        isActive = false;
+      };
+    }, [state.dbInitialized, user])
+  );
 
   const loadDashboardData = async () => {
     if (!state.dbInitialized || !user) return;
@@ -62,7 +79,7 @@ const HomeScreen = ({ navigation }) => {
       const userId = user.id || 1; // Get current user ID
       
       // Load recent workouts for current user
-      const recent = await DatabaseManager.getWorkoutHistory(userId, 5);
+      const recent = await DatabaseManager.getRecentWorkouts(userId, 5);
       setRecentWorkouts(recent);
 
       // Load workout templates
@@ -368,7 +385,7 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.recentWorkoutsContainer}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Workouts</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+        <TouchableOpacity onPress={() => navigation.navigate('WorkoutHistory')}>
           <Text style={styles.seeAllText}>See All</Text>
         </TouchableOpacity>
       </View>

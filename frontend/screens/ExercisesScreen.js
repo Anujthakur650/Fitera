@@ -306,6 +306,7 @@ const ExercisesScreen = () => {
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.exerciseList}
         showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <MaterialIcons name="fitness-center" size={48} color="#ccc" />
@@ -508,7 +509,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   categoryTabsContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
     backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
@@ -539,9 +540,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
-    width: 80,
     height: 32,
-    maxWidth: 80,
   },
   selectedCategoryTab: {
     backgroundColor: '#007AFF',
@@ -733,6 +732,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     lineHeight: 22,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#e9ecef',
+    marginLeft: 16, 
   },
 });
 

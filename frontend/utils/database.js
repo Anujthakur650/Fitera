@@ -4,9 +4,15 @@ import ErrorHandler from './errorHandler';
 class DatabaseManager {
   constructor() {
     this.db = null;
+    this.isInitialized = false;
   }
 
   async initDatabase() {
+    if (this.isInitialized) {
+      console.log('Database already initialized, skipping...');
+      return true;
+    }
+    
     try {
       this.db = await SQLite.openDatabaseAsync('strongclone.db');
       
@@ -15,11 +21,13 @@ class DatabaseManager {
       
       await this.createTables();
       await this.migrateToUserAssociation(); // Add user association migration
+      await this.migrateWorkoutNaming(); // Standardize workout naming
       await this.seedExercises();
       
       // Verify database integrity
       await this.verifyDatabaseIntegrity();
       
+      this.isInitialized = true;
       return true;
     } catch (error) {
       ErrorHandler.logError(error, { screen: 'Database', action: 'initDatabase' }, 'CRITICAL');
@@ -289,6 +297,88 @@ class DatabaseManager {
     }
   }
 
+  async migrateWorkoutNaming() {
+    try {
+      // Add migration flag column if it doesn't exist
+      try {
+        await this.db.execAsync('ALTER TABLE workouts ADD COLUMN naming_migrated BOOLEAN DEFAULT 0');
+      } catch (error) {
+        // Column might already exist
+      }
+
+      // Get all workouts
+      const allWorkouts = await this.db.getAllAsync(
+        'SELECT id, name, date FROM workouts WHERE 1=1'
+      );
+
+      console.log(`Checking ${allWorkouts.length} workouts for name/date consistency...`);
+      
+      let updatedCount = 0;
+      
+      for (const workout of allWorkouts) {
+        let needsUpdate = false;
+        let newName = workout.name;
+        
+        // Get the actual date from the workout
+        const workoutDate = new Date(workout.date);
+        const monthNames = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        const monthName = monthNames[workoutDate.getMonth()];
+        const dayNum = workoutDate.getDate();
+        
+        // Check if it's an old format "Workout 7/23/2025"
+        const oldFormatRegex = /Workout\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/;
+        const oldMatch = workout.name.match(oldFormatRegex);
+        
+        if (oldMatch) {
+          // Convert old format to new format
+          newName = `Workout - ${monthName} ${dayNum}`;
+          needsUpdate = true;
+        } else if (workout.name.startsWith('Workout - ')) {
+          // Check if the name matches the actual date
+          const expectedName = `Workout - ${monthName} ${dayNum}`;
+          if (workout.name !== expectedName && !workout.name.includes('Quick')) {
+            // Only update if it's a regular workout (not Quick Workout)
+            newName = expectedName;
+            needsUpdate = true;
+          }
+        } else if (workout.name.startsWith('Temp Workout')) {
+          // Fix temporary workout names
+          newName = `Workout - ${monthName} ${dayNum}`;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          // Update the workout name to match its actual date
+          await this.db.runAsync(
+            'UPDATE workouts SET name = ?, naming_migrated = 1 WHERE id = ?',
+            [newName, workout.id]
+          );
+          updatedCount++;
+          console.log(`Updated workout ${workout.id}: "${workout.name}" → "${newName}"`);
+        } else {
+          // Mark as migrated even if no change needed
+          await this.db.runAsync(
+            'UPDATE workouts SET naming_migrated = 1 WHERE id = ?',
+            [workout.id]
+          );
+        }
+      }
+      
+      if (updatedCount > 0) {
+        console.log(`✅ Workout naming migration completed: ${updatedCount} workouts updated to match their dates`);
+      } else {
+        console.log('✅ Workout naming migration completed: all workouts already have consistent naming');
+      }
+      
+    } catch (error) {
+      console.error('Workout naming migration failed:', error);
+      ErrorHandler.logError(error, { screen: 'Database', action: 'migrateWorkoutNaming' }, 'HIGH');
+    }
+  }
+
   async seedExercises() {
     // Check if exercises already exist
     const result = await this.db.getFirstAsync('SELECT COUNT(*) as count FROM exercises');
@@ -403,9 +493,18 @@ class DatabaseManager {
 
   // Workout methods
   async createWorkout(name, templateId = null, userId = 1) {
+    // Get current local date/time in SQLite format
+    const now = new Date();
+    const localDateTime = now.getFullYear() + '-' + 
+                         String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+                         String(now.getDate()).padStart(2, '0') + ' ' + 
+                         String(now.getHours()).padStart(2, '0') + ':' + 
+                         String(now.getMinutes()).padStart(2, '0') + ':' + 
+                         String(now.getSeconds()).padStart(2, '0');
+    
     const result = await this.db.runAsync(
-      'INSERT INTO workouts (name, template_id, user_id) VALUES (?, ?, ?)',
-      [name, templateId, userId]
+      'INSERT INTO workouts (name, template_id, user_id, date) VALUES (?, ?, ?, ?)',
+      [name, templateId, userId, localDateTime]
     );
     return result.lastInsertRowId;
   }
@@ -424,12 +523,68 @@ class DatabaseManager {
 
   async getWorkoutHistory(userId, limit = 50) {
     try {
-      return await this.db.getAllAsync(
-        'SELECT * FROM workouts WHERE is_completed = 1 AND user_id = ? ORDER BY date DESC LIMIT ?',
-        [userId, limit]
-      );
+      // Get workouts with exercise and set counts to filter out empty workouts
+      const workouts = await this.db.getAllAsync(`
+        SELECT 
+          w.id,
+          w.name,
+          w.date,
+          w.duration,
+          w.notes,
+          w.is_completed,
+          w.user_id,
+          COUNT(DISTINCT we.id) as exercise_count,
+          COUNT(DISTINCT s.id) as set_count,
+          COALESCE(SUM(s.weight * s.reps), 0) as total_volume
+        FROM workouts w
+        INNER JOIN workout_exercises we ON w.id = we.workout_id
+        INNER JOIN sets s ON we.id = s.workout_exercise_id AND s.is_completed = 1
+        WHERE w.is_completed = 1 
+          AND w.user_id = ? 
+          AND w.duration > 0
+        GROUP BY w.id, w.name, w.date, w.duration, w.notes, w.is_completed, w.user_id
+        HAVING exercise_count > 0 AND set_count > 0
+        ORDER BY w.date DESC, w.id DESC
+        LIMIT ?
+      `, [userId, limit]);
+      
+      return workouts;
     } catch (error) {
       ErrorHandler.handleDatabaseError(error, { screen: 'Database', action: 'getWorkoutHistory', userId });
+      return [];
+    }
+  }
+
+  async getRecentWorkouts(userId, limit = 5) {
+    try {
+      // Get recent workouts with same criteria as getWorkoutHistory to ensure consistency
+      const workouts = await this.db.getAllAsync(`
+        SELECT 
+          w.id,
+          w.name,
+          w.date,
+          w.duration,
+          w.notes,
+          w.is_completed,
+          w.user_id,
+          COUNT(DISTINCT we.id) as exercise_count,
+          COUNT(DISTINCT s.id) as set_count,
+          COALESCE(SUM(s.weight * s.reps), 0) as total_volume
+        FROM workouts w
+        INNER JOIN workout_exercises we ON w.id = we.workout_id
+        INNER JOIN sets s ON we.id = s.workout_exercise_id AND s.is_completed = 1
+        WHERE w.is_completed = 1 
+          AND w.user_id = ? 
+          AND w.duration > 0
+        GROUP BY w.id, w.name, w.date, w.duration, w.notes, w.is_completed, w.user_id
+        HAVING exercise_count > 0 AND set_count > 0
+        ORDER BY w.date DESC, w.id DESC
+        LIMIT ?
+      `, [userId, limit]);
+      
+      return workouts;
+    } catch (error) {
+      ErrorHandler.handleDatabaseError(error, { screen: 'Database', action: 'getRecentWorkouts', userId });
       return [];
     }
   }
@@ -487,12 +642,10 @@ class DatabaseManager {
       // Delete workout
       await this.db.runAsync('DELETE FROM workouts WHERE id = ? AND user_id = ?', [workoutId, userId]);
       
-      // Log successful deletion for audit trail
-      ErrorHandler.logError(
-        { message: 'Workout deleted', code: 'WORKOUT_DELETED' },
-        { screen: 'Database', action: 'deleteWorkout', userId, workoutId },
-        'INFO'
-      );
+      // Log successful deletion for audit trail (using console.log for info-level logging)
+      if (__DEV__) {
+        console.log(`[INFO] Workout deleted successfully - workoutId: ${workoutId}, userId: ${userId}`);
+      }
     } catch (error) {
       const result = ErrorHandler.handleDatabaseError(error, { screen: 'Database', action: 'deleteWorkout', userId });
       throw new Error(result.message);

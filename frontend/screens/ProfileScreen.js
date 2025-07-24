@@ -196,10 +196,105 @@ const ProfileScreen = () => {
   const exportData = async () => {
     Alert.alert(
       'Export Data',
-      'This feature would export your workout data to a file or cloud service.',
+      'Choose export format for your workout data',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Export', onPress: () => console.log('Export data functionality') }
+        { 
+          text: 'Export as JSON', 
+          onPress: async () => {
+            try {
+              const userId = user?.id || 1;
+              
+              // Gather all user data
+              const userData = {
+                exportDate: new Date().toISOString(),
+                user: userProfile,
+                workouts: [],
+                exercises: [],
+                bodyMeasurements: []
+              };
+
+              // Get all workouts
+              const workouts = await DatabaseManager.getAllAsync(
+                'SELECT * FROM workouts WHERE user_id = ? ORDER BY date DESC',
+                [userId]
+              );
+
+              // Get exercises and sets for each workout
+              for (const workout of workouts) {
+                const workoutData = { ...workout, exercises: [] };
+                
+                // Get exercises for this workout
+                const exercises = await DatabaseManager.getAllAsync(`
+                  SELECT we.*, e.name as exercise_name, e.muscle_groups 
+                  FROM workout_exercises we 
+                  JOIN exercises e ON we.exercise_id = e.id 
+                  WHERE we.workout_id = ? 
+                  ORDER BY we.order_index
+                `, [workout.id]);
+
+                // Get sets for each exercise
+                for (const exercise of exercises) {
+                  const sets = await DatabaseManager.getAllAsync(
+                    'SELECT * FROM sets WHERE workout_exercise_id = ? ORDER BY set_number',
+                    [exercise.id]
+                  );
+                  workoutData.exercises.push({
+                    ...exercise,
+                    sets: sets
+                  });
+                }
+                
+                userData.workouts.push(workoutData);
+              }
+
+              // Get all exercises used
+              userData.exercises = await DatabaseManager.getAllAsync(`
+                SELECT DISTINCT e.* 
+                FROM exercises e
+                JOIN workout_exercises we ON e.id = we.exercise_id
+                JOIN workouts w ON we.workout_id = w.id
+                WHERE w.user_id = ?
+              `, [userId]);
+
+              // Get body measurements
+              userData.bodyMeasurements = await DatabaseManager.getAllAsync(
+                'SELECT * FROM body_measurements WHERE user_id = ? ORDER BY date DESC',
+                [userId]
+              );
+
+              // Convert to JSON string
+              const jsonData = JSON.stringify(userData, null, 2);
+              
+              // Create filename with timestamp
+              const filename = `fitera_export_${new Date().toISOString().split('T')[0]}.json`;
+              
+              // For now, we'll log the data and show a success message
+              // In a real implementation, you would use expo-sharing or expo-file-system
+              console.log('Exported data:', jsonData);
+              
+              Alert.alert(
+                'Export Successful',
+                `Your data has been prepared for export.\n\nFilename: ${filename}\n\nIn a production app, this would save to your device or share via email/cloud.`,
+                [
+                  {
+                    text: 'Copy to Clipboard',
+                    onPress: async () => {
+                      // In a real app, you would use Clipboard API here
+                      // import * as Clipboard from 'expo-clipboard';
+                      // await Clipboard.setStringAsync(jsonData);
+                      Alert.alert('Success', 'Data copied to clipboard (simulated)');
+                    }
+                  },
+                  { text: 'OK' }
+                ]
+              );
+            } catch (error) {
+              console.error('Error exporting data:', error);
+              Alert.alert('Error', 'Failed to export data. Please try again.');
+            }
+          }
+        }
       ]
     );
   };
@@ -216,17 +311,31 @@ const ProfileScreen = () => {
           onPress: async () => {
             try {
               // Delete only current user's data with proper user isolation
+              // First delete sets that belong to workout exercises of user's workouts
               await DatabaseManager.runAsync(
-                'DELETE FROM sets WHERE workout_id IN (SELECT id FROM workouts WHERE user_id = ?)',
+                `DELETE FROM sets WHERE workout_exercise_id IN (
+                  SELECT we.id FROM workout_exercises we 
+                  JOIN workouts w ON we.workout_id = w.id 
+                  WHERE w.user_id = ?
+                )`,
                 [user.id]
               );
+              
+              // Then delete workout exercises
               await DatabaseManager.runAsync(
                 'DELETE FROM workout_exercises WHERE workout_id IN (SELECT id FROM workouts WHERE user_id = ?)',
                 [user.id]
               );
+              
+              // Delete workouts
               await DatabaseManager.runAsync('DELETE FROM workouts WHERE user_id = ?', [user.id]);
+              
+              // Delete body measurements
               await DatabaseManager.runAsync('DELETE FROM body_measurements WHERE user_id = ?', [user.id]);
+              
+              // Delete personal records
               await DatabaseManager.runAsync('DELETE FROM personal_records WHERE user_id = ?', [user.id]);
+              
               await loadWorkoutStats();
               Alert.alert('Success', 'Your data has been cleared successfully');
             } catch (error) {

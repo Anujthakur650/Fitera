@@ -19,6 +19,7 @@ import WorkoutScreen from './screens/WorkoutScreen';
 import ExercisesScreen from './screens/ExercisesScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import WorkoutHistoryScreen from './screens/WorkoutHistoryScreen';
 
 // Import authentication screens
 import WelcomeScreen from './screens/WelcomeScreen';
@@ -35,6 +36,16 @@ function AuthNavigator() {
       <Stack.Screen name="Welcome" component={WelcomeScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Stack navigator for Home tab
+function HomeStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="HomeScreen" component={HomeScreen} />
+      <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
     </Stack.Navigator>
   );
 }
@@ -93,7 +104,7 @@ function MainTabs() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Home" component={HomeStack} />
       <Tab.Screen name="Workout" component={WorkoutScreen} />
       <Tab.Screen name="Exercises" component={ExercisesScreen} />
       <Tab.Screen name="Analytics" component={AnalyticsScreen} />
@@ -130,13 +141,18 @@ function AppNavigator() {
   );
 }
 
+let securityInitialized = false;
+
 export default function App() {
   // Initialize security system when app starts
   useEffect(() => {
     const initSecurity = async () => {
+      if (securityInitialized) return; // Prevent duplicate initialization
+      
       try {
         console.log('🔐 Initializing security system...');
         await SecurityMigrationManager.initializeSecurity();
+        securityInitialized = true;
         console.log('✅ Security system ready');
       } catch (error) {
         console.warn('⚠️ Security initialization failed, using legacy mode:', error.message);

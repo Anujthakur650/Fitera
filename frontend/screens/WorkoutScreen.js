@@ -16,6 +16,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useWorkout } from '../contexts/WorkoutContext';
 import DatabaseManager from '../utils/database';
+import { formatWorkoutDate } from '../utils/dateFormatter';
 
 const WorkoutScreen = ({ navigation }) => {
   const {
@@ -189,7 +190,7 @@ const WorkoutScreen = ({ navigation }) => {
 
   const handleStartWorkout = async () => {
     try {
-      const workoutName = `Workout ${new Date().toLocaleDateString()}`;
+      const workoutName = `Workout - ${formatWorkoutDate(new Date())}`;
       const workoutId = await startWorkout(workoutName);
       
       if (workoutId) {
@@ -425,6 +426,7 @@ const WorkoutScreen = ({ navigation }) => {
                 <TextInput
                   style={styles.setInput}
                   placeholder="Weight"
+                  placeholderTextColor="#333"
                   value={getSetInputValue(exercise.id, 'weight')}
                   onChangeText={(value) => handleSetInputChange(exercise.id, 'weight', value)}
                   keyboardType="numeric"
@@ -433,6 +435,7 @@ const WorkoutScreen = ({ navigation }) => {
                 <TextInput
                   style={styles.setInput}
                   placeholder="Reps"
+                  placeholderTextColor="#333"
                   value={getSetInputValue(exercise.id, 'reps')}
                   onChangeText={(value) => handleSetInputChange(exercise.id, 'reps', value)}
                   keyboardType="numeric"
