@@ -185,80 +185,94 @@ const HomeScreen = ({ navigation }) => {
     handleStartWorkout();
   };
 
+  // ==========================================
+  // ACTIVE WORKOUT CARD TEMPORARILY REMOVED
+  // ==========================================
+  // The Active Workout card has been commented out for clean production deployment
+  // due to persistent styling and alignment issues. Users can access workout
+  // functionality through the Workout tab.
+  // 
+  // Original renderActiveWorkout function preserved below for future reference:
+  //
+  // const renderActiveWorkout = () => {
+  //   if (!state.activeWorkout) return null;
+  //
+  //   return (
+  //     <EnhancedCard 
+  //       gradient={true}
+  //       gradientColors={THEME.colors.gradients.primary}
+  //       style={styles.activeWorkoutCard}
+  //     >
+  //       <View style={styles.activeWorkoutHeader}>
+  //         <Text style={styles.activeWorkoutTitle}>Active Workout</Text>
+  //         <Text style={styles.activeWorkoutTime}>
+  //           {formatTime(state.timer.duration)}
+  //         </Text>
+  //       </View>
+  //       
+  //       <Text style={styles.activeWorkoutName}>{state.activeWorkout.name}</Text>
+  //       
+  //       <View style={styles.activeWorkoutStats}>
+  //         <View style={styles.activeWorkoutStatItem}>
+  //           <Text style={styles.activeWorkoutStatNumber}>{state.workoutExercises.length}</Text>
+  //           <Text style={styles.activeWorkoutStatLabel}>Exercises</Text>
+  //         </View>
+  //         <View style={styles.activeWorkoutStatItem}>
+  //           <Text style={styles.activeWorkoutStatNumber}>
+  //             {Object.values(state.exerciseSets).flat().length}
+  //           </Text>
+  //           <Text style={styles.activeWorkoutStatLabel}>Sets</Text>
+  //         </View>
+  //         <View style={styles.activeWorkoutStatItem}>
+  //           <Text style={styles.activeWorkoutStatNumber}>
+  //             {Object.values(state.exerciseSets).flat().reduce((total, set) => 
+  //               total + (set.weight * set.reps), 0
+  //             ).toLocaleString()} lbs
+  //           </Text>
+  //           <Text style={styles.activeWorkoutStatLabel}>Volume</Text>
+  //         </View>
+  //       </View>
+  //
+  //       <View style={styles.activeWorkoutButtons}>
+  //         <View style={styles.buttonWrapper}>
+  //           <EnhancedButton
+  //             title="Continue"
+  //             variant="secondary"
+  //             size="medium"
+  //             icon="play-arrow"
+  //             onPress={() => navigation.navigate('Workout')}
+  //             style={styles.buttonStyle}
+  //           />
+  //         </View>
+  //         
+  //         <View style={styles.buttonWrapper}>
+  //           <EnhancedButton
+  //             title="Finish"
+  //             variant="outline"
+  //             size="medium"
+  //             icon="check"
+  //             onPress={() => {
+  //               Alert.alert(
+  //                 'Finish Workout',
+  //                 'Are you sure you want to finish this workout?',
+  //                 [
+  //                   { text: 'Cancel', style: 'cancel' },
+  //                   { text: 'Finish', onPress: completeWorkout }
+  //                 ]
+  //               );
+  //             }}
+  //             style={styles.buttonStyle}
+  //             textStyle={styles.finishButtonText}
+  //           />
+  //         </View>
+  //       </View>
+  //     </EnhanchedCard>
+  //   );
+  // };
+  
   const renderActiveWorkout = () => {
-    if (!state.activeWorkout) return null;
-
-    return (
-      <EnhancedCard 
-        gradient={true}
-        gradientColors={THEME.colors.gradients.primary}
-        style={styles.activeWorkoutCard}
-      >
-        <View style={styles.activeWorkoutHeader}>
-          <Text style={styles.activeWorkoutTitle}>Active Workout</Text>
-          <Text style={styles.activeWorkoutTime}>
-            {formatTime(state.timer.duration)}
-          </Text>
-        </View>
-        
-        <Text style={styles.activeWorkoutName}>{state.activeWorkout.name}</Text>
-        
-        <View style={styles.activeWorkoutStats}>
-          <View style={styles.activeWorkoutStatItem}>
-            <Text style={styles.activeWorkoutStatNumber}>{state.workoutExercises.length}</Text>
-            <Text style={styles.activeWorkoutStatLabel}>Exercises</Text>
-          </View>
-          <View style={styles.activeWorkoutStatItem}>
-            <Text style={styles.activeWorkoutStatNumber}>
-              {Object.values(state.exerciseSets).flat().length}
-            </Text>
-            <Text style={styles.activeWorkoutStatLabel}>Sets</Text>
-          </View>
-          <View style={styles.activeWorkoutStatItem}>
-            <Text style={styles.activeWorkoutStatNumber}>
-              {Object.values(state.exerciseSets).flat().reduce((total, set) => 
-                total + (set.weight * set.reps), 0
-              ).toLocaleString()} lbs
-            </Text>
-            <Text style={styles.activeWorkoutStatLabel}>Volume</Text>
-          </View>
-        </View>
-
-        <View style={styles.activeWorkoutButtons}>
-          <View style={styles.buttonWrapper}>
-            <EnhancedButton
-              title="Continue"
-              variant="secondary"
-              size="medium"
-              icon="play-arrow"
-              onPress={() => navigation.navigate('Workout')}
-              style={styles.buttonStyle}
-            />
-          </View>
-          
-          <View style={styles.buttonWrapper}>
-            <EnhancedButton
-              title="Finish"
-              variant="outline"
-              size="medium"
-              icon="check"
-              onPress={() => {
-                Alert.alert(
-                  'Finish Workout',
-                  'Are you sure you want to finish this workout?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Finish', onPress: completeWorkout }
-                  ]
-                );
-              }}
-              style={styles.buttonStyle}
-              textStyle={styles.finishButtonText}
-            />
-          </View>
-        </View>
-      </EnhancedCard>
-    );
+    // Active Workout card removed for clean production deployment
+    return null;
   };
 
   const renderQuickActions = () => (
@@ -493,86 +507,92 @@ const styles = StyleSheet.create({
     marginTop: THEME.spacing.xs,
     fontWeight: THEME.typography.fontWeight.medium,
   },
-activeWorkoutCard: {
-    margin: THEME.spacing.xl,
-    marginTop: THEME.spacing.lg,
-    padding: 0,
-  },
-  activeWorkoutHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: THEME.spacing.md,
-  },
-  activeWorkoutTitle: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: THEME.typography.fontSize.sm,
-    fontWeight: THEME.typography.fontWeight.semibold,
-    letterSpacing: THEME.typography.letterSpacing.widest,
-    textTransform: 'uppercase',
-  },
-  activeWorkoutTime: {
-    color: THEME.colors.white,
-    fontSize: THEME.typography.fontSize.xl,
-    fontWeight: THEME.typography.fontWeight.bold,
-  },
-  activeWorkoutName: {
-    color: THEME.colors.white,
-    fontSize: THEME.typography.fontSize['2xl'],
-    fontWeight: THEME.typography.fontWeight.bold,
-    marginBottom: THEME.spacing.lg,
-    letterSpacing: THEME.typography.letterSpacing.tight,
-  },
-activeWorkoutStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: THEME.spacing.lg,
-    paddingHorizontal: THEME.spacing.md,
-  },
-activeWorkoutStatItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  activeWorkoutStatNumber: {
-    color: THEME.colors.white,
-    fontSize: THEME.typography.fontSize['2xl'],
-    fontWeight: THEME.typography.fontWeight.bold,
-  },
-  activeWorkoutStatLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: THEME.typography.fontSize.xs,
-    marginTop: THEME.spacing.xs,
-    fontWeight: THEME.typography.fontWeight.medium,
-    letterSpacing: THEME.typography.letterSpacing.wide,
-    textTransform: 'uppercase',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-activeWorkoutButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'stretch',
-    gap: THEME.spacing.md,
-    marginTop: THEME.spacing.md,
-    height: 48, // Fixed container height
-  },
-  buttonWrapper: {
-    flex: 1,
-    height: 48,
-    overflow: 'hidden', // Prevent buttons from growing beyond wrapper
-  },
-  buttonStyle: {
-    height: 48,
-    minHeight: 48,
-    maxHeight: 48,
-    flex: 1,
-    margin: 0,
-    padding: 0,
-  },
-  finishButtonText: {
-    color: THEME.colors.white,
-  },
+// ==========================================
+  // ACTIVE WORKOUT STYLES TEMPORARILY COMMENTED OUT
+  // ==========================================
+  // These styles are preserved for future reference when the Active Workout
+  // card is re-implemented with proper alignment fixes
+  //
+  // activeWorkoutCard: {
+  //   margin: THEME.spacing.xl,
+  //   marginTop: THEME.spacing.lg,
+  //   padding: 0,
+  // },
+  // activeWorkoutHeader: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'center',
+  //   marginBottom: THEME.spacing.md,
+  // },
+  // activeWorkoutTitle: {
+  //   color: 'rgba(255,255,255,0.9)',
+  //   fontSize: THEME.typography.fontSize.sm,
+  //   fontWeight: THEME.typography.fontWeight.semibold,
+  //   letterSpacing: THEME.typography.letterSpacing.widest,
+  //   textTransform: 'uppercase',
+  // },
+  // activeWorkoutTime: {
+  //   color: THEME.colors.white,
+  //   fontSize: THEME.typography.fontSize.xl,
+  //   fontWeight: THEME.typography.fontWeight.bold,
+  // },
+  // activeWorkoutName: {
+  //   color: THEME.colors.white,
+  //   fontSize: THEME.typography.fontSize['2xl'],
+  //   fontWeight: THEME.typography.fontWeight.bold,
+  //   marginBottom: THEME.spacing.lg,
+  //   letterSpacing: THEME.typography.letterSpacing.tight,
+  // },
+  // activeWorkoutStats: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   marginBottom: THEME.spacing.lg,
+  //   paddingHorizontal: THEME.spacing.md,
+  // },
+  // activeWorkoutStatItem: {
+  //   alignItems: 'center',
+  //   flex: 1,
+  // },
+  // activeWorkoutStatNumber: {
+  //   color: THEME.colors.white,
+  //   fontSize: THEME.typography.fontSize['2xl'],
+  //   fontWeight: THEME.typography.fontWeight.bold,
+  // },
+  // activeWorkoutStatLabel: {
+  //   color: 'rgba(255,255,255,0.8)',
+  //   fontSize: THEME.typography.fontSize.xs,
+  //   marginTop: THEME.spacing.xs,
+  //   fontWeight: THEME.typography.fontWeight.medium,
+  //   letterSpacing: THEME.typography.letterSpacing.wide,
+  //   textTransform: 'uppercase',
+  // },
+  // statItem: {
+  //   alignItems: 'center',
+  // },
+  // activeWorkoutButtons: {
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-between',
+  //   alignItems: 'stretch',
+  //   gap: THEME.spacing.md,
+  //   marginTop: THEME.spacing.md,
+  //   height: 48, // Fixed container height
+  // },
+  // buttonWrapper: {
+  //   flex: 1,
+  //   height: 48,
+  //   overflow: 'hidden', // Prevent buttons from growing beyond wrapper
+  // },
+  // buttonStyle: {
+  //   height: 48,
+  //   minHeight: 48,
+  //   maxHeight: 48,
+  //   flex: 1,
+  //   margin: 0,
+  //   padding: 0,
+  // },
+  // finishButtonText: {
+  //   color: THEME.colors.white,
+  // },
   quickActionsContainer: {
     marginHorizontal: THEME.spacing.xl,
     marginBottom: THEME.spacing['2xl'],
