@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useWorkout } from '../contexts/WorkoutContext';
 import DatabaseManager from '../utils/database';
 
@@ -22,6 +23,7 @@ const ExercisesScreen = () => {
   } = useWorkout();
   
   const [exercises, setExercises] = useState([]);
+  const [allExercises, setAllExercises] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,13 +39,19 @@ const ExercisesScreen = () => {
     instructions: ''
   });
 
+  // Ref for category tabs ScrollView
+  const categoryScrollViewRef = React.useRef(null);
+
   useEffect(() => {
     loadData();
   }, []);
 
   useEffect(() => {
-    filterExercises();
-  }, [selectedCategory, searchQuery]);
+    // Only filter if data is loaded
+    if (allExercises.length > 0 && categories.length > 0) {
+      filterExercises();
+    }
+  }, [selectedCategory, searchQuery, allExercises, categories]);
 
   const loadData = async () => {
     try {
@@ -57,40 +65,73 @@ const ExercisesScreen = () => {
         DatabaseManager.getExerciseCategories()
       ]);
       
+      console.log('📊 Categories loaded:', categoriesData);
+      console.log('📊 Exercises loaded:', exercisesData.length);
+      
+      setAllExercises(exercisesData);
       setExercises(exercisesData);
-      setCategories([{ id: 'all', name: 'All', icon: 'fitness-center' }, ...categoriesData]);
+      
+      // Always ensure we have at least the basic categories
+      const defaultCategories = [
+        { id: 'all', name: 'All', icon: 'fitness-center' },
+        { id: 1, name: 'Chest', icon: 'fitness-center' },
+        { id: 2, name: 'Back', icon: 'fitness-center' },
+        { id: 3, name: 'Shoulders', icon: 'fitness-center' },
+        { id: 4, name: 'Arms', icon: 'fitness-center' },
+        { id: 5, name: 'Legs', icon: 'fitness-center' },
+        { id: 6, name: 'Core', icon: 'fitness-center' },
+        { id: 7, name: 'Cardio', icon: 'fitness-center' }
+      ];
+      
+      const allCategories = categoriesData && categoriesData.length > 0 
+        ? [{ id: 'all', name: 'All', icon: 'fitness-center' }, ...categoriesData]
+        : defaultCategories;
+      
+      console.log('📊 Final categories:', allCategories);
+      setCategories(allCategories);
     } catch (error) {
       console.error('Error loading exercises:', error);
+      // Set default categories even on error
+      const defaultCategories = [
+        { id: 'all', name: 'All', icon: 'fitness-center' },
+        { id: 1, name: 'Chest', icon: 'fitness-center' },
+        { id: 2, name: 'Back', icon: 'fitness-center' },
+        { id: 3, name: 'Shoulders', icon: 'fitness-center' },
+        { id: 4, name: 'Arms', icon: 'fitness-center' },
+        { id: 5, name: 'Legs', icon: 'fitness-center' },
+        { id: 6, name: 'Core', icon: 'fitness-center' },
+        { id: 7, name: 'Cardio', icon: 'fitness-center' }
+      ];
+      setCategories(defaultCategories);
       Alert.alert('Error', 'Failed to load exercises');
     } finally {
       setLoading(false);
     }
   };
 
-  const filterExercises = async () => {
-    try {
-      let filteredExercises;
-      
-      if (searchQuery.trim()) {
-        // Search exercises
-        filteredExercises = await DatabaseManager.searchExercises(searchQuery);
-      } else if (selectedCategory === 'All') {
-        // Show all exercises
-        filteredExercises = await DatabaseManager.getExercises();
-      } else {
-        // Filter by category
-        const category = categories.find(cat => cat.name === selectedCategory);
-        if (category && category.id !== 'all') {
-          filteredExercises = await DatabaseManager.getExercises(category.id);
-        } else {
-          filteredExercises = await DatabaseManager.getExercises();
-        }
-      }
-      
-      setExercises(filteredExercises);
-    } catch (error) {
-      console.error('Error filtering exercises:', error);
+  const filterExercises = () => {
+    let filteredExercises = allExercises;
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const searchLower = searchQuery.toLowerCase();
+      filteredExercises = filteredExercises.filter(exercise => 
+        exercise.name.toLowerCase().includes(searchLower) ||
+        exercise.muscle_groups.toLowerCase().includes(searchLower)
+      );
     }
+    
+    // Apply category filter
+    if (selectedCategory !== 'All') {
+      const category = categories.find(cat => cat.name === selectedCategory);
+      if (category && category.id !== 'all') {
+        filteredExercises = filteredExercises.filter(exercise => 
+          exercise.category_id === category.id
+        );
+      }
+    }
+    
+    setExercises(filteredExercises);
   };
 
   const handleAddCustomExercise = async () => {
@@ -153,27 +194,7 @@ const ExercisesScreen = () => {
     }
   };
 
-  const renderCategoryTab = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.categoryTab,
-        selectedCategory === item.name && styles.selectedCategoryTab
-      ]}
-      onPress={() => setSelectedCategory(item.name)}
-    >
-      <MaterialIcons 
-        name={item.icon} 
-        size={16} 
-        color={selectedCategory === item.name ? '#007AFF' : '#666'} 
-      />
-      <Text style={[
-        styles.categoryTabText,
-        selectedCategory === item.name && styles.selectedCategoryTabText
-      ]}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
-  );
+
 
   const renderExerciseCard = ({ item }) => (
     <View style={styles.exerciseCard}>
@@ -244,15 +265,54 @@ const ExercisesScreen = () => {
       </View>
 
       {/* Category Tabs */}
-      <FlatList
-        data={categories}
-        renderItem={renderCategoryTab}
-        keyExtractor={(item) => item.id.toString()}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryTabs}
-        contentContainerStyle={styles.categoryTabsContent}
-      />
+      <View style={styles.categoryTabsContainer}>
+        <ScrollView
+          ref={categoryScrollViewRef}
+          horizontal
+          showsHorizontalScrollIndicator={true}
+          style={styles.categoryTabs}
+          contentContainerStyle={styles.categoryTabsContent}
+          decelerationRate="normal"
+        >
+          {categories.length > 0 ? categories.map((item, index) => (
+            <TouchableOpacity
+              key={item.id.toString()}
+              style={[
+                styles.categoryTab,
+                selectedCategory === item.name && styles.selectedCategoryTab
+              ]}
+              onPress={() => {
+                console.log('📊 Category selected:', item.name);
+                setSelectedCategory(item.name);
+                // Auto-scroll to ensure selected tab is visible
+                if (categoryScrollViewRef.current && index > 2) {
+                  const scrollPosition = (index - 2) * 92; // More accurate calculation
+                  categoryScrollViewRef.current.scrollTo({
+                    x: scrollPosition,
+                    animated: true
+                  });
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name={item.icon || 'fitness-center'}
+                size={16}
+                color={selectedCategory === item.name ? '#fff' : '#007AFF'}
+                style={styles.tabIcon}
+              />
+              <Text style={[
+                styles.categoryTabText,
+                selectedCategory === item.name && styles.selectedCategoryTabText
+              ]}>
+                {item.name}
+              </Text>
+            </TouchableOpacity>
+          )) : (
+            <Text style={{ padding: 16, color: '#999' }}>No categories loaded</Text>
+          )}
+        </ScrollView>
+      </View>
 
       {/* Exercise List */}
       <FlatList
@@ -273,9 +333,9 @@ const ExercisesScreen = () => {
 
       {/* Add Custom Exercise Modal */}
       <Modal
-        visible={showAddCustomModal}
+visible={showAddCustomModal}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="overFullScreen"
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -462,36 +522,59 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+  categoryTabsContainer: {
+    position: 'relative',
+    height: 60,
+    marginBottom: 8,
+    backgroundColor: 'transparent',
+  },
   categoryTabs: {
-    maxHeight: 50,
+    height: 60,
   },
   categoryTabsContent: {
     paddingHorizontal: 16,
     paddingVertical: 8,
+    paddingRight: 24,
+    alignItems: 'center',
   },
   categoryTab: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    marginRight: 8,
-    borderRadius: 20,
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 10,
+    borderRadius: 22,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: '#007AFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+    minWidth: 90,
+    height: 44,
   },
   selectedCategoryTab: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: '#007AFF',
     borderColor: '#007AFF',
   },
   categoryTabText: {
-    marginLeft: 6,
+    marginLeft: 4,
     fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
+    color: '#007AFF',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   selectedCategoryTabText: {
-    color: '#007AFF',
+    color: '#fff',
+  },
+  tabIcon: {
+    // Icon styling handled in component
   },
   exerciseList: {
     padding: 16,

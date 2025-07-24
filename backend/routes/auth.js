@@ -17,7 +17,16 @@ router.post('/register', [
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      // Return user-friendly validation errors without exposing system details
+      const userErrors = errors.array().map(err => ({
+        field: err.param,
+        message: err.msg
+      }));
+      return res.status(400).json({ 
+        success: false,
+        message: 'Validation failed',
+        errors: userErrors 
+      });
     }
 
     const { username, email, password } = req.body;
@@ -25,7 +34,12 @@ router.post('/register', [
     // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
+      // Don't reveal whether it's the email or username that exists
+      return res.status(400).json({ 
+        success: false,
+        message: 'An account with this information already exists',
+        code: 'AUTH_USER_EXISTS'
+      });
     }
 
     // Create new user
@@ -45,8 +59,15 @@ router.post('/register', [
       }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    // Log error securely without exposing details to client
+    console.error('Registration error:', error.message);
+    
+    // Return generic error message
+    res.status(500).json({ 
+      success: false,
+      message: 'Registration failed. Please try again later.',
+      code: 'OPERATION_FAILED'
+    });
   }
 });
 
@@ -61,7 +82,16 @@ router.post('/login', [
     // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      // Return user-friendly validation errors
+      const userErrors = errors.array().map(err => ({
+        field: err.param,
+        message: err.msg
+      }));
+      return res.status(400).json({ 
+        success: false,
+        message: 'Validation failed',
+        errors: userErrors 
+      });
     }
 
     const { email, password } = req.body;
@@ -69,13 +99,23 @@ router.post('/login', [
     // Find user
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      // Use same error message for both invalid email and password
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid email or password',
+        code: 'AUTH_INVALID_CREDENTIALS'
+      });
     }
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      // Use same error message to prevent user enumeration
+      return res.status(400).json({ 
+        success: false,
+        message: 'Invalid email or password',
+        code: 'AUTH_INVALID_CREDENTIALS'
+      });
     }
 
     // Generate token
@@ -91,8 +131,24 @@ router.post('/login', [
       }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+    // Log error securely without exposing details
+    console.error('Login error:', error.message);
+    
+    // Check for specific error types
+    if (error.name === 'MongoNetworkError') {
+      return res.status(503).json({ 
+        success: false,
+        message: 'Service temporarily unavailable. Please try again later.',
+        code: 'SERVICE_UNAVAILABLE'
+      });
+    }
+    
+    // Return generic error message
+    res.status(500).json({ 
+      success: false,
+      message: 'Login failed. Please try again later.',
+      code: 'OPERATION_FAILED'
+    });
   }
 });
 

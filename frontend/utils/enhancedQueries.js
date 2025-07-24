@@ -2,7 +2,7 @@ import DatabaseManager from './database';
 
 export class EnhancedQueries {
   // Get comprehensive workout statistics for analytics
-  static async getWorkoutAnalytics(timeframeDays = 30) {
+  static async getWorkoutAnalytics(userId, timeframeDays = 30) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - timeframeDays);
 
@@ -24,12 +24,13 @@ export class EnhancedQueries {
       LEFT JOIN workout_exercises we ON w.id = we.workout_id
       LEFT JOIN sets s ON we.id = s.workout_exercise_id AND s.is_completed = 1
       WHERE w.is_completed = 1 
+        AND w.user_id = ?
         AND w.date >= ?
       GROUP BY w.id
       ORDER BY w.date DESC
     `;
 
-    return await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString()]);
+    return await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString()]);
   }
 
   // Get muscle group distribution with detailed breakdown
@@ -99,7 +100,7 @@ export class EnhancedQueries {
       ORDER BY w.date ASC, s.set_number ASC
     `;
 
-    return await DatabaseManager.getAllAsync(query, [exerciseId, cutoffDate.toISOString()]);
+    return await DatabaseManager.getAllAsync(query, [exerciseId, userId, cutoffDate.toISOString()]);
   }
 
   // Get personal records with detailed history
@@ -213,7 +214,7 @@ export class EnhancedQueries {
       ORDER BY w.date ASC
     `;
 
-    return await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString()]);
+    return await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString()]);
   }
 
   // Get workout frequency patterns
@@ -238,7 +239,7 @@ export class EnhancedQueries {
       ORDER BY date ASC
     `;
 
-    return await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString()]);
+    return await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString()]);
   }
 
   // Get exercise variety and frequency
@@ -276,7 +277,7 @@ export class EnhancedQueries {
       ORDER BY workout_frequency DESC, total_volume DESC
     `;
 
-    return await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString(), cutoffDate.toISOString()]);
+    return await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString(), cutoffDate.toISOString()]);
   }
 
   // Get performance consistency metrics
@@ -310,7 +311,7 @@ export class EnhancedQueries {
       ORDER BY w.date ASC
     `;
 
-    return await DatabaseManager.getAllAsync(query, [exerciseId, cutoffDate.toISOString()]);
+    return await DatabaseManager.getAllAsync(query, [exerciseId, userId, cutoffDate.toISOString()]);
   }
 
   // Get body measurement trends
@@ -338,7 +339,7 @@ export class EnhancedQueries {
       ORDER BY measurement_type, date ASC
     `;
 
-    return await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString()]);
+    return await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString()]);
   }
 
   // Get workout intensity analysis
@@ -372,7 +373,7 @@ export class EnhancedQueries {
       ORDER BY w.date DESC
     `;
 
-    return await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString()]);
+    return await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString()]);
   }
 }
 

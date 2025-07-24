@@ -1,0 +1,85 @@
+{
+  "expo": {
+    "name": "Fitera",
+    "slug": "fitera-workout-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "fitera",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6366F1"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fitera.workouttracker",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses camera to take progress photos (optional feature)",
+        "NSPhotoLibraryUsageDescription": "This app accesses photo library to save progress photos (optional feature)",
+        "NSFaceIDUsageDescription": "Use Face ID to securely access your workout data",
+        "NSMotionUsageDescription": "Motion data helps track your workouts automatically"
+      },
+      "associatedDomains": ["applinks:fitera.app"],
+      "usesAppleSignIn": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6366F1"
+      },
+      "package": "com.fitera.workouttracker",
+      "versionCode": 1,
+      "permissions": [
+        "VIBRATE",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT"
+      ],
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.fitera.workouttracker",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "fitera.app"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-local-authentication",
+      "expo-secure-store",
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "PORTRAIT_UP"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
+  }
+} 

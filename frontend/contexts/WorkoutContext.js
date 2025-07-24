@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import DatabaseManager from '../utils/database';
+import { useAuth } from './AuthContext';
 
 const WorkoutContext = createContext();
 
@@ -10,7 +11,17 @@ const workoutReducer = (state, action) => {
       return { ...state, dbInitialized: action.payload };
     
     case 'SET_ACTIVE_WORKOUT':
-      return { ...state, activeWorkout: action.payload };
+      return {
+        ...state,
+        activeWorkout: action.payload.workout,
+        workoutExercises: action.payload.exercises || [],
+        exerciseSets: action.payload.sets || {},
+        timer: {
+          duration: 0,
+          isRunning: true,
+          startTime: Date.now(),
+        },
+      };
     
     case 'SET_WORKOUT_EXERCISES':
       return { ...state, workoutExercises: action.payload };
@@ -159,9 +170,16 @@ const initialState = {
 };
 
 export const WorkoutProvider = ({ children }) => {
+  const auth = useAuth();
   const [state, dispatch] = useReducer(workoutReducer, initialState);
   const timerInterval = useRef(null);
   const restTimerInterval = useRef(null);
+  const { user } = useAuth();
+
+  // Helper to get current user ID
+  const getCurrentUserId = () => {
+    return user?.id || 1; // Fallback to 1 for backward compatibility
+  };
 
   // Initialize database on app start
   useEffect(() => {
@@ -169,9 +187,9 @@ export const WorkoutProvider = ({ children }) => {
       const success = await DatabaseManager.initDatabase();
       dispatch({ type: 'INIT_DATABASE', payload: success });
       
-      if (success) {
-        // Check for active workout
-        const activeWorkout = await DatabaseManager.getActiveWorkout();
+      if (success && user) {
+        // Check for active workout for the current user
+        const activeWorkout = await DatabaseManager.getActiveWorkout(getCurrentUserId());
         if (activeWorkout) {
           dispatch({ type: 'SET_ACTIVE_WORKOUT', payload: activeWorkout });
           loadWorkoutData(activeWorkout.id);
@@ -180,7 +198,7 @@ export const WorkoutProvider = ({ children }) => {
     };
     
     initDB();
-  }, []);
+  }, [user]); // Re-run when user changes
 
   // Timer management
   useEffect(() => {
@@ -234,15 +252,42 @@ export const WorkoutProvider = ({ children }) => {
 
   const startWorkout = async (name, templateId = null) => {
     try {
-      const workoutId = await DatabaseManager.createWorkout(name, templateId);
-      const workout = { id: workoutId, name, date: new Date(), is_completed: 0 };
-      
-      dispatch({ type: 'SET_ACTIVE_WORKOUT', payload: workout });
-      dispatch({ type: 'START_TIMER' });
-      
-      return workoutId;
+      const startTime = new Date().toISOString();
+      const workoutId = await DatabaseManager.createWorkout(name, templateId, auth.user.id);
+      const newWorkout = { id: workoutId, name, date: startTime };
+
+      let exercises = [];
+      let sets = {};
+
+      if (templateId) {
+        const templateExercises = await DatabaseManager.getAllAsync(
+          'SELECT exercise_id FROM workout_template_exercises WHERE template_id = ?',
+          [templateId]
+        );
+
+        const exerciseDetailsPromises = templateExercises.map(row =>
+          DatabaseManager.getFirstAsync('SELECT * FROM exercises WHERE id = ?', [row.exercise_id])
+        );
+
+        exercises = await Promise.all(exerciseDetailsPromises);
+
+        exercises.forEach(ex => {
+          if (ex) sets[ex.id] = [];
+        });
+      }
+
+      dispatch({
+        type: 'SET_ACTIVE_WORKOUT',
+        payload: {
+          workout: newWorkout,
+          exercises: exercises.filter(Boolean), // Filter out any nulls if an exercise isn't found
+          sets: sets
+        }
+      });
+
+      return newWorkout;
     } catch (error) {
-      console.error('Error starting workout:', error);
+      console.error('Failed to start workout:', error);
       return null;
     }
   };

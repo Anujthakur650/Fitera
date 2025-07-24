@@ -1,0 +1,49 @@
+{
+  "cli": {
+    "version": ">= 7.8.6"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "production": {
+      "ios": {
+        "bundleIdentifier": "com.fitera.workouttracker",
+        "buildNumber": "1.0.0",
+        "distribution": "store",
+        "autoIncrement": "buildNumber"
+      },
+      "android": {
+        "package": "com.fitera.workouttracker",
+        "versionCode": 1,
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      },
+      "env": {
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_APP_NAME": "Fitera",
+        "EXPO_PUBLIC_ANALYTICS_ENABLED": "true"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "your-app-store-connect-app-id",
+        "appleTeamId": "your-apple-team-id"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "production"
+      }
+    }
+  }
+} 

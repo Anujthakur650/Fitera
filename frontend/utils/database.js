@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import ErrorHandler from './errorHandler';
 
 class DatabaseManager {
   constructor() {
@@ -8,12 +9,101 @@ class DatabaseManager {
   async initDatabase() {
     try {
       this.db = await SQLite.openDatabaseAsync('strongclone.db');
+      
+      // Enable foreign key constraints - CRITICAL for data integrity
+      await this.enableForeignKeyConstraints();
+      
       await this.createTables();
+      await this.migrateToUserAssociation(); // Add user association migration
       await this.seedExercises();
+      
+      // Verify database integrity
+      await this.verifyDatabaseIntegrity();
+      
       return true;
     } catch (error) {
-      console.error('Database initialization failed:', error);
+      ErrorHandler.logError(error, { screen: 'Database', action: 'initDatabase' }, 'CRITICAL');
       return false;
+    }
+  }
+
+  async enableForeignKeyConstraints() {
+    try {
+      // Enable foreign key constraints
+      await this.db.execAsync('PRAGMA foreign_keys = ON');
+      
+      // Enable Write-Ahead Logging for better concurrency
+      await this.db.execAsync('PRAGMA journal_mode = WAL');
+      
+      // Set synchronous mode for data integrity
+      await this.db.execAsync('PRAGMA synchronous = NORMAL');
+      
+      // Verify foreign keys are enabled
+      const fkStatus = await this.db.getFirstAsync('PRAGMA foreign_keys');
+      
+      if (fkStatus.foreign_keys !== 1) {
+        throw new Error('Failed to enable foreign key constraints');
+      }
+      
+      // Add database optimization pragmas
+      await this.db.execAsync('PRAGMA optimize');
+      await this.db.execAsync('PRAGMA cache_size = 10000');
+      await this.db.execAsync('PRAGMA temp_store = MEMORY');
+      
+      console.log('✅ Database security settings enabled:');
+      console.log('  - Foreign key constraints: ENABLED');
+      console.log('  - WAL mode: ENABLED');
+      console.log('  - Optimization: ENABLED');
+      
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'Database', action: 'enableForeignKeyConstraints' }, 'CRITICAL');
+      throw error;
+    }
+  }
+
+  async verifyDatabaseIntegrity() {
+    try {
+      // Check for orphaned data
+      const orphanChecks = [
+        {
+          name: 'Orphaned workouts',
+          query: 'SELECT COUNT(*) as count FROM workouts WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users)'
+        },
+        {
+          name: 'Orphaned personal records',
+          query: 'SELECT COUNT(*) as count FROM personal_records WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users)'
+        },
+        {
+          name: 'Orphaned body measurements',
+          query: 'SELECT COUNT(*) as count FROM body_measurements WHERE user_id IS NOT NULL AND user_id NOT IN (SELECT id FROM users)'
+        }
+      ];
+
+      let hasOrphans = false;
+      for (const check of orphanChecks) {
+        try {
+          const result = await this.db.getFirstAsync(check.query);
+          if (result && result.count > 0) {
+            hasOrphans = true;
+            console.error(`❌ ${check.name}: ${result.count}`);
+            ErrorHandler.logError(
+              new Error(`${check.name} detected`),
+              { count: result.count, check: check.name },
+              'HIGH'
+            );
+          }
+        } catch (error) {
+          // Table might not exist yet during initial setup
+          console.log(`Skipping check for ${check.name} - table may not exist yet`);
+        }
+      }
+
+      if (!hasOrphans) {
+        console.log('✅ Database integrity check passed - no orphaned data');
+      }
+
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'Database', action: 'verifyDatabaseIntegrity' }, 'MEDIUM');
     }
   }
 
@@ -76,17 +166,19 @@ class DatabaseManager {
       );
     `);
 
-    // Workouts table
+    // Workouts table (with user association)
     await this.db.execAsync(`
       CREATE TABLE IF NOT EXISTS workouts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
         name TEXT NOT NULL,
         date DATETIME DEFAULT CURRENT_TIMESTAMP,
         duration INTEGER DEFAULT 0,
         notes TEXT,
         template_id INTEGER,
         is_completed BOOLEAN DEFAULT 0,
-        FOREIGN KEY (template_id) REFERENCES workout_templates (id)
+        FOREIGN KEY (template_id) REFERENCES workout_templates (id),
+        FOREIGN KEY (user_id) REFERENCES users (id)
       );
     `);
 
@@ -146,6 +238,55 @@ class DatabaseManager {
         notes TEXT
       );
     `);
+  }
+
+  async migrateToUserAssociation() {
+    try {
+      // Check if password column exists in users table
+      const usersTableInfo = await this.db.getAllAsync("PRAGMA table_info(users)");
+      const hasPasswordColumn = usersTableInfo.some(column => column.name === 'password');
+      
+      if (!hasPasswordColumn) {
+        console.log('Adding password column to users table...');
+        await this.db.execAsync('ALTER TABLE users ADD COLUMN password TEXT');
+        console.log('Password column added to users table');
+      }
+
+      // Check if user_id column already exists in workouts table
+      const tableInfo = await this.db.getAllAsync("PRAGMA table_info(workouts)");
+      const hasUserIdColumn = tableInfo.some(column => column.name === 'user_id');
+      
+      if (!hasUserIdColumn) {
+        console.log('Adding user_id column to workouts table...');
+        await this.db.execAsync('ALTER TABLE workouts ADD COLUMN user_id INTEGER');
+        
+        // For existing workouts, we'll set user_id to 1 (default user)
+        // This ensures backward compatibility
+        await this.db.execAsync('UPDATE workouts SET user_id = 1 WHERE user_id IS NULL');
+        
+        console.log('Migration completed: workouts now associated with users');
+      }
+
+      // Update body_measurements table as well
+      const measurementsInfo = await this.db.getAllAsync("PRAGMA table_info(body_measurements)");
+      const hasUserIdInMeasurements = measurementsInfo.some(column => column.name === 'user_id');
+      
+      if (!hasUserIdInMeasurements) {
+        await this.db.execAsync('ALTER TABLE body_measurements ADD COLUMN user_id INTEGER');
+        await this.db.execAsync('UPDATE body_measurements SET user_id = 1 WHERE user_id IS NULL');
+      }
+
+      // Update personal_records table as well
+      const recordsInfo = await this.db.getAllAsync("PRAGMA table_info(personal_records)");
+      const hasUserIdInRecords = recordsInfo.some(column => column.name === 'user_id');
+      
+      if (!hasUserIdInRecords) {
+        await this.db.execAsync('ALTER TABLE personal_records ADD COLUMN user_id INTEGER');
+        await this.db.execAsync('UPDATE personal_records SET user_id = 1 WHERE user_id IS NULL');
+      }
+    } catch (error) {
+      console.error('Migration failed:', error);
+    }
   }
 
   async seedExercises() {
@@ -261,25 +402,36 @@ class DatabaseManager {
   }
 
   // Workout methods
-  async createWorkout(name, templateId = null) {
+  async createWorkout(name, templateId = null, userId = 1) {
     const result = await this.db.runAsync(
-      'INSERT INTO workouts (name, template_id) VALUES (?, ?)',
-      [name, templateId]
+      'INSERT INTO workouts (name, template_id, user_id) VALUES (?, ?, ?)',
+      [name, templateId, userId]
     );
     return result.lastInsertRowId;
   }
 
-  async getActiveWorkout() {
-    return await this.db.getFirstAsync(
-      'SELECT * FROM workouts WHERE is_completed = 0 ORDER BY date DESC LIMIT 1'
-    );
+  async getActiveWorkout(userId) {
+    try {
+      return await this.db.getFirstAsync(
+        'SELECT * FROM workouts WHERE is_completed = 0 AND user_id = ? ORDER BY date DESC LIMIT 1',
+        [userId]
+      );
+    } catch (error) {
+      ErrorHandler.handleDatabaseError(error, { screen: 'Database', action: 'getActiveWorkout', userId });
+      return null;
+    }
   }
 
-  async getWorkoutHistory(limit = 50) {
-    return await this.db.getAllAsync(
-      'SELECT * FROM workouts WHERE is_completed = 1 ORDER BY date DESC LIMIT ?',
-      [limit]
-    );
+  async getWorkoutHistory(userId, limit = 50) {
+    try {
+      return await this.db.getAllAsync(
+        'SELECT * FROM workouts WHERE is_completed = 1 AND user_id = ? ORDER BY date DESC LIMIT ?',
+        [userId, limit]
+      );
+    } catch (error) {
+      ErrorHandler.handleDatabaseError(error, { screen: 'Database', action: 'getWorkoutHistory', userId });
+      return [];
+    }
   }
 
   async addExerciseToWorkout(workoutId, exerciseId, orderIndex) {
@@ -298,6 +450,53 @@ class DatabaseManager {
       WHERE we.workout_id = ? 
       ORDER BY we.order_index
     `, [workoutId]);
+  }
+
+  async finishWorkout(workoutId, duration) {
+    return await this.db.runAsync(
+      'UPDATE workouts SET is_completed = 1, duration = ? WHERE id = ?',
+      [duration, workoutId]
+    );
+  }
+
+  async deleteWorkout(workoutId, userId) {
+    try {
+      // First verify the workout belongs to the user
+      const workout = await this.db.getFirstAsync(
+        'SELECT id FROM workouts WHERE id = ? AND user_id = ?',
+        [workoutId, userId]
+      );
+      
+      if (!workout) {
+        const error = new Error('Workout not found or access denied');
+        error.code = 'WORKOUT_ACCESS_DENIED';
+        throw error;
+      }
+      
+      // Delete sets first
+      await this.db.runAsync(`
+        DELETE FROM sets 
+        WHERE workout_exercise_id IN (
+          SELECT id FROM workout_exercises WHERE workout_id = ?
+        )
+      `, [workoutId]);
+      
+      // Delete workout exercises
+      await this.db.runAsync('DELETE FROM workout_exercises WHERE workout_id = ?', [workoutId]);
+      
+      // Delete workout
+      await this.db.runAsync('DELETE FROM workouts WHERE id = ? AND user_id = ?', [workoutId, userId]);
+      
+      // Log successful deletion for audit trail
+      ErrorHandler.logError(
+        { message: 'Workout deleted', code: 'WORKOUT_DELETED' },
+        { screen: 'Database', action: 'deleteWorkout', userId, workoutId },
+        'INFO'
+      );
+    } catch (error) {
+      const result = ErrorHandler.handleDatabaseError(error, { screen: 'Database', action: 'deleteWorkout', userId });
+      throw new Error(result.message);
+    }
   }
 
   // Sets methods
@@ -328,23 +527,33 @@ class DatabaseManager {
   }
 
   // Progress tracking
-  async getExerciseHistory(exerciseId, limit = 10) {
-    return await this.db.getAllAsync(`
-      SELECT s.*, w.date, we.workout_id
-      FROM sets s
-      JOIN workout_exercises we ON s.workout_exercise_id = we.id
-      JOIN workouts w ON we.workout_id = w.id
-      WHERE we.exercise_id = ? AND w.is_completed = 1
-      ORDER BY w.date DESC
-      LIMIT ?
-    `, [exerciseId, limit]);
+  async getExerciseHistory(exerciseId, userId, limit = 10) {
+    try {
+      return await this.db.getAllAsync(`
+        SELECT s.*, w.date, we.workout_id
+        FROM sets s
+        JOIN workout_exercises we ON s.workout_exercise_id = we.id
+        JOIN workouts w ON we.workout_id = w.id
+        WHERE we.exercise_id = ? AND w.is_completed = 1 AND w.user_id = ?
+        ORDER BY w.date DESC
+        LIMIT ?
+      `, [exerciseId, userId, limit]);
+    } catch (error) {
+      ErrorHandler.handleDatabaseError(error, { screen: 'Database', action: 'getExerciseHistory', userId });
+      return [];
+    }
   }
 
-  async getPersonalRecords(exerciseId) {
-    return await this.db.getAllAsync(
-      'SELECT * FROM personal_records WHERE exercise_id = ? ORDER BY date DESC',
-      [exerciseId]
-    );
+  async getPersonalRecords(exerciseId, userId) {
+    try {
+      return await this.db.getAllAsync(
+        'SELECT * FROM personal_records WHERE exercise_id = ? AND user_id = ? ORDER BY date DESC',
+        [exerciseId, userId]
+      );
+    } catch (error) {
+      ErrorHandler.handleDatabaseError(error, { screen: 'Database', action: 'getPersonalRecords', userId });
+      return [];
+    }
   }
 
   // Workout completion
@@ -402,6 +611,49 @@ class DatabaseManager {
 
   async getFirstAsync(query, params = []) {
     return await this.db.getFirstAsync(query, params);
+  }
+
+  // User methods
+  async getUserById(userId) {
+    return await this.db.getFirstAsync(
+      'SELECT * FROM users WHERE id = ?',
+      [userId]
+    );
+  }
+
+  async updateUserProfile(userId, updates) {
+    const { name, email, weight, height } = updates;
+    return await this.db.runAsync(
+      'UPDATE users SET name = ?, email = ?, weight = ?, height = ? WHERE id = ?',
+      [name, email, weight, height, userId]
+    );
+  }
+
+  async markUserAsReturning(userId) {
+    // Add is_new_user column if it doesn't exist
+    try {
+      await this.db.execAsync('ALTER TABLE users ADD COLUMN is_new_user BOOLEAN DEFAULT 1');
+    } catch (error) {
+      // Column might already exist, that's ok
+    }
+    
+    return await this.db.runAsync(
+      'UPDATE users SET is_new_user = 0 WHERE id = ?',
+      [userId]
+    );
+  }
+
+  async isNewUser(userId) {
+    try {
+      const result = await this.db.getFirstAsync(
+        'SELECT is_new_user FROM users WHERE id = ?',
+        [userId]
+      );
+      return result?.is_new_user === 1 || result?.is_new_user === null; // null means new (no column yet)
+    } catch (error) {
+      console.error('Error checking if user is new:', error);
+      return true; // Default to new user if error
+    }
   }
 }
 

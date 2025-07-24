@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.local
+.env.*.local
 .DS_Store
 *.log
 build/
@@ -12,5 +14,12 @@ dist/
 *.swp
 *.swo
 *~
-.env.local
-.env.*.local
+
+# iOS
+ios/Pods/
+ios/Podfile.lock
+
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties

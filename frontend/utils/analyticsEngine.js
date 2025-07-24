@@ -629,7 +629,7 @@ class AnalyticsEngine {
   }
 
   // ===== WORKOUT FREQUENCY ANALYSIS =====
-  async getWorkoutFrequencyAnalysis(timeframe = 90) {
+  async getWorkoutFrequencyAnalysis(userId, timeframe = 90) {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - timeframe);
@@ -642,12 +642,13 @@ class AnalyticsEngine {
           SUM(duration) as total_duration
         FROM workouts
         WHERE is_completed = 1
+          AND user_id = ?
           AND date >= ?
         GROUP BY DATE(date)
         ORDER BY workout_date ASC
       `;
 
-      const dailyWorkouts = await DatabaseManager.getAllAsync(query, [cutoffDate.toISOString()]);
+      const dailyWorkouts = await DatabaseManager.getAllAsync(query, [userId, cutoffDate.toISOString()]);
       
       const weeklyStats = this.groupWorkoutsByWeek(dailyWorkouts);
       const frequencyMetrics = this.calculateFrequencyMetrics(dailyWorkouts, weeklyStats);
@@ -814,7 +815,7 @@ class AnalyticsEngine {
   }
 
   // ===== COMPREHENSIVE ANALYTICS DASHBOARD =====
-  async getComprehensiveAnalytics(timeframe = 30) {
+  async getComprehensiveAnalytics(userId, timeframe = 30) {
     try {
       const [
         muscleBalance,
@@ -823,11 +824,11 @@ class AnalyticsEngine {
         personalRecords,
         frequencyAnalysis
       ] = await Promise.all([
-        this.getMuscleGroupBalance(timeframe),
-        this.getVolumeDistribution(timeframe),
-        this.getStrengthRatios(),
-        this.getPersonalRecords(5),
-        this.getWorkoutFrequencyAnalysis(timeframe)
+        this.getMuscleGroupBalance(userId, timeframe),
+        this.getVolumeDistribution(userId, timeframe),
+        this.getStrengthRatios(userId),
+        this.getPersonalRecords(userId, 5),
+        this.getWorkoutFrequencyAnalysis(userId, timeframe)
       ]);
 
       const overallScore = this.calculateOverallFitnessScore({

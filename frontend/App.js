@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -6,17 +6,40 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { WorkoutProvider } from './contexts/WorkoutContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import THEME from './constants/theme';
+import LoadingSpinner from './components/LoadingSpinner';
 
-// Import screens
+// Import security system
+import SecurityMigrationManager from './utils/securityMigration';
+
+// Import main app screens
 import HomeScreen from './screens/HomeScreen';
 import WorkoutScreen from './screens/WorkoutScreen';
 import ExercisesScreen from './screens/ExercisesScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 
+// Import authentication screens
+import WelcomeScreen from './screens/WelcomeScreen';
+import LoginScreen from './screens/LoginScreen';
+import RegisterScreen from './screens/RegisterScreen';
+
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
+// Authentication Stack Navigator
+function AuthNavigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Register" component={RegisterScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Main App Tab Navigator (for authenticated users)
 function MainTabs() {
   return (
     <Tab.Navigator
@@ -38,14 +61,35 @@ function MainTabs() {
 
           return <Icon name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
-        headerStyle: {
-          backgroundColor: '#007AFF',
+        tabBarActiveTintColor: THEME.colors.primary,
+        tabBarInactiveTintColor: THEME.colors.gray400,
+        tabBarStyle: {
+          backgroundColor: THEME.colors.gray900, // Dark background for the tab bar
+          borderTopColor: THEME.colors.gray700,
+          borderTopWidth: 1,
+          paddingBottom: 12,
+          paddingTop: 10,
+          height: 68,
         },
-        headerTintColor: '#fff',
+        tabBarLabelStyle: {
+          fontSize: THEME.typography.fontSize.xs,
+          fontWeight: THEME.typography.fontWeight.semibold,
+          marginBottom: 1,
+          marginTop: 1,
+        },
+        headerStyle: {
+          backgroundColor: THEME.colors.primary,
+          shadowColor: THEME.colors.primary,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.2,
+          shadowRadius: 4,
+          elevation: 4,
+        },
+        headerTintColor: THEME.colors.white,
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: THEME.typography.fontWeight.bold,
+          fontSize: THEME.typography.fontSize.lg,
+          letterSpacing: THEME.typography.letterSpacing.wide,
         },
       })}
     >
@@ -58,17 +102,58 @@ function MainTabs() {
   );
 }
 
+// Main App Navigator with Authentication Logic
+function AppNavigator() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <SafeAreaProvider style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: THEME.colors.primary }}>
+        <LoadingSpinner size={60} gradient={true} />
+      </SafeAreaProvider>
+    );
+  }
+
+  return (
+    <NavigationContainer theme={{ colors: { background: THEME.colors.gray900 } }}>
+      <StatusBar style="light" />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {user ? (
+          // User is authenticated - show main app
+          <Stack.Screen name="Main" component={MainTabs} />
+        ) : (
+          // User is not authenticated - show auth flow
+          <Stack.Screen name="Auth" component={AuthNavigator} />
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
+  // Initialize security system when app starts
+  useEffect(() => {
+    const initSecurity = async () => {
+      try {
+        console.log('🔐 Initializing security system...');
+        await SecurityMigrationManager.initializeSecurity();
+        console.log('✅ Security system ready');
+      } catch (error) {
+        console.warn('⚠️ Security initialization failed, using legacy mode:', error.message);
+      }
+    };
+    
+    initSecurity();
+  }, []);
+
   return (
     <SafeAreaProvider>
-      <WorkoutProvider>
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Main" component={MainTabs} />
-          </Stack.Navigator>
-        </NavigationContainer>
-        <StatusBar style="auto" />
-      </WorkoutProvider>
+      <AuthProvider>
+        <WorkoutProvider>
+          <AppNavigator />
+          <StatusBar style="auto" />
+        </WorkoutProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

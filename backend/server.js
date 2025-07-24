@@ -5,6 +5,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
+const validateEnvironment = require('./config/validateEnv');
+
+// Validate environment variables
+const config = validateEnvironment();
 
 // Initialize express app
 const app = express();
@@ -14,14 +18,15 @@ app.use(helmet());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+  windowMs: config.security.rateLimit.windowMs,
+  max: config.security.rateLimit.max,
+  message: 'Too many requests from this IP, please try again later.'
 });
 app.use('/api/', limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:19006',
+  origin: config.server.frontendUrl,
   credentials: true
 }));
 
@@ -30,8 +35,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
+if (config.server.env === 'development') {
+  app.use(morgan(config.logging.format));
 }
 
 // MongoDB connection
@@ -40,9 +45,12 @@ const mongooseOptions = {
   useUnifiedTopology: true,
 };
 
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/strongclone', mongooseOptions)
-  .then(() => console.log('MongoDB connected successfully'))
-  .catch(err => console.error('MongoDB connection error:', err));
+mongoose.connect(config.mongodb.uri, mongooseOptions)
+  .then(() => console.log('✅ MongoDB connected successfully'))
+  .catch(err => {
+    console.error('❌ MongoDB connection error:', err);
+    process.exit(1);
+  });
 
 // API Routes (to be implemented)
 app.use('/api/auth', require('./routes/auth'));
@@ -56,7 +64,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: config.server.env,
+    version: config.api.version
   });
 });
 
@@ -65,7 +74,7 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({
     message: err.message || 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err : {}
+    error: config.server.env === 'development' ? err : {}
   });
 });
 
@@ -75,9 +84,10 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(config.server.port, () => {
+  console.log(`🚀 Server running on port ${config.server.port}`);
+  console.log(`🌍 Environment: ${config.server.env}`);
+  console.log(`🔗 API Prefix: ${config.api.prefix}`);
 });
 
 module.exports = app;

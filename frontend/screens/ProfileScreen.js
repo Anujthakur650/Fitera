@@ -14,13 +14,18 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useWorkout } from '../contexts/WorkoutContext';
+import { useAuth } from '../contexts/AuthContext';
 import DatabaseManager from '../utils/database';
+import THEME from '../constants/theme';
+import EnhancedButton from '../components/EnhancedButton';
+import EnhancedCard from '../components/EnhancedCard';
 
 const ProfileScreen = () => {
   const { state } = useWorkout();
+  const { user, logout } = useAuth();
   const [userProfile, setUserProfile] = useState({
-    name: 'Strong User',
-    email: '',
+    name: user?.username || user?.name || 'Fitera User',
+    email: user?.email || '',
     weight: '',
     height: '',
     memberSince: new Date().toISOString().split('T')[0]
@@ -56,15 +61,24 @@ const ProfileScreen = () => {
   const loadUserData = async () => {
     try {
       await DatabaseManager.initDatabase();
-      // Load user profile from database (in a real app, this would come from authentication)
+      // Load user profile from database, prioritizing authenticated user data
       const users = await DatabaseManager.getAllAsync('SELECT * FROM users LIMIT 1');
       if (users.length > 0) {
         setUserProfile({
-          name: users[0].name || 'Strong User',
-          email: users[0].email || '',
+          name: user?.username || user?.name || users[0].name || 'Fitera User',
+          email: user?.email || users[0].email || '',
           weight: users[0].weight || '',
           height: users[0].height || '',
           memberSince: users[0].created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
+        });
+      } else {
+        // If no local data, use authenticated user data
+        setUserProfile({
+          name: user?.username || user?.name || 'Fitera User',
+          email: user?.email || '',
+          weight: '',
+          height: '',
+          memberSince: new Date().toISOString().split('T')[0]
         });
       }
     } catch (error) {
@@ -74,31 +88,46 @@ const ProfileScreen = () => {
 
   const loadWorkoutStats = async () => {
     try {
-      // Get total completed workouts
+      const userId = user?.id || 1; // Get current user ID
+      
+      // Get total completed workouts for current user
       const totalWorkouts = await DatabaseManager.getFirstAsync(
-        'SELECT COUNT(*) as count FROM workouts WHERE is_completed = 1'
+        'SELECT COUNT(*) as count FROM workouts WHERE is_completed = 1 AND user_id = ?',
+        [userId]
       );
 
-      // Get total volume (sets * weight * reps) - need to join with workout_exercises
+      // Get total volume (sets * weight * reps) for current user
       const volumeResult = await DatabaseManager.getFirstAsync(
         `SELECT SUM(s.weight * s.reps) as volume 
          FROM sets s 
          JOIN workout_exercises we ON s.workout_exercise_id = we.id 
-         WHERE s.is_completed = 1`
+         JOIN workouts w ON we.workout_id = w.id
+         WHERE s.is_completed = 1 AND w.user_id = ?`,
+        [userId]
       );
 
-      // Get personal records count (count of distinct exercises with completed sets)
+      // Get personal records count for current user
       const prResult = await DatabaseManager.getFirstAsync(
         `SELECT COUNT(DISTINCT we.exercise_id) as count 
          FROM sets s 
          JOIN workout_exercises we ON s.workout_exercise_id = we.id 
-         WHERE s.is_completed = 1`
+         JOIN workouts w ON we.workout_id = w.id
+         WHERE s.is_completed = 1 AND w.user_id = ?`,
+        [userId]
       );
 
-      // Get average workout duration
+      // Get average workout duration for current user
       const avgDuration = await DatabaseManager.getFirstAsync(
-        'SELECT AVG(duration) as avg FROM workouts WHERE is_completed = 1 AND duration > 0'
+        'SELECT AVG(duration) as avg FROM workouts WHERE is_completed = 1 AND duration > 0 AND user_id = ?',
+        [userId]
       );
+
+      console.log('Loading workout stats for user:', userId, {
+        totalWorkouts: totalWorkouts?.count || 0,
+        totalVolume: Math.round(volumeResult?.volume || 0),
+        personalRecords: prResult?.count || 0,
+        averageWorkoutTime: Math.round(avgDuration?.avg || 0)
+      });
 
       setWorkoutStats({
         totalWorkouts: totalWorkouts?.count || 0,
@@ -186,14 +215,44 @@ const ProfileScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await DatabaseManager.runAsync('DELETE FROM sets');
-              await DatabaseManager.runAsync('DELETE FROM workout_exercises');
-              await DatabaseManager.runAsync('DELETE FROM workouts');
-              await DatabaseManager.runAsync('DELETE FROM body_measurements');
+              // Delete only current user's data with proper user isolation
+              await DatabaseManager.runAsync(
+                'DELETE FROM sets WHERE workout_id IN (SELECT id FROM workouts WHERE user_id = ?)',
+                [user.id]
+              );
+              await DatabaseManager.runAsync(
+                'DELETE FROM workout_exercises WHERE workout_id IN (SELECT id FROM workouts WHERE user_id = ?)',
+                [user.id]
+              );
+              await DatabaseManager.runAsync('DELETE FROM workouts WHERE user_id = ?', [user.id]);
+              await DatabaseManager.runAsync('DELETE FROM body_measurements WHERE user_id = ?', [user.id]);
+              await DatabaseManager.runAsync('DELETE FROM personal_records WHERE user_id = ?', [user.id]);
               await loadWorkoutStats();
-              Alert.alert('Success', 'All data cleared successfully');
+              Alert.alert('Success', 'Your data has been cleared successfully');
             } catch (error) {
+              console.error('Error clearing user data:', error);
               Alert.alert('Error', 'Failed to clear data');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out? Your workout data will be saved locally.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to sign out. Please try again.');
             }
           }
         }
@@ -375,14 +434,14 @@ const ProfileScreen = () => {
           {renderSettingsItem(
             'info',
             'App Version',
-            'StrongClone v1.0.0',
+            'Fitera v1.0.0',
             () => {}
           )}
           {renderSettingsItem(
             'help',
             'Help & Support',
             'Get help using the app',
-            () => Alert.alert('Help', 'Contact support at help@strongclone.com')
+            () => Alert.alert('Help', 'Contact support at help@fitera.app')
           )}
           {renderSettingsItem(
             'star',
@@ -392,9 +451,37 @@ const ProfileScreen = () => {
           )}
         </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Made with 💪 for fitness enthusiasts</Text>
+        {/* Account Management */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          {user && (
+            <View style={styles.userInfoContainer}>
+              <MaterialIcons name="person" size={20} color={THEME.colors.primary} style={styles.userIcon} />
+              <View style={styles.userInfo}>
+                <Text style={styles.userEmail}>{user.email}</Text>
+                <Text style={styles.userStatus}>Signed in</Text>
+              </View>
+            </View>
+          )}
+          
+          <View style={styles.logoutButtonContainer}>
+            <EnhancedButton
+              title="Sign Out"
+              variant="outline"
+              size="large"
+              icon="logout"
+              onPress={handleLogout}
+              style={styles.logoutButton}
+              textStyle={styles.logoutButtonText}
+            />
+          </View>
         </View>
+
+        
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Made with 💪 for fitness enthusiasts</Text>
+      </View>
       </ScrollView>
 
       {/* Edit Profile Modal */}
@@ -780,6 +867,39 @@ const styles = StyleSheet.create({
   },
   segmentTextActive: {
     color: '#fff',
+  },
+  userInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  userIcon: {
+    marginRight: 12,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userEmail: {
+    fontSize: 16,
+    fontWeight: THEME.typography.fontWeight.medium,
+    color: THEME.colors.gray900,
+  },
+  userStatus: {
+    fontSize: 14,
+    color: THEME.colors.secondary,
+    marginTop: 2,
+  },
+  logoutButtonContainer: {
+    padding: 20,
+  },
+  logoutButton: {
+    borderColor: THEME.colors.error || '#dc3545',
+  },
+  logoutButtonText: {
+    color: THEME.colors.error || '#dc3545',
   },
 });
 

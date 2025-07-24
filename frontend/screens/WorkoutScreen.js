@@ -27,7 +27,8 @@ const WorkoutScreen = ({ navigation }) => {
     completeWorkout,
     startRestTimer,
     clearRestTimer,
-    formatTime
+    formatTime,
+    startWorkout
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -47,11 +48,7 @@ const WorkoutScreen = ({ navigation }) => {
   const [exerciseInstructions, setExerciseInstructions] = useState({});
   const [previousWorkoutData, setPreviousWorkoutData] = useState({});
 
-  useEffect(() => {
-    if (!state.activeWorkout) {
-      navigation.navigate('Home');
-    }
-  }, [state.activeWorkout]);
+  // Remove automatic redirect to Home - let user stay on Workout screen
 
   useEffect(() => {
     if (state.restTimer.isActive) {
@@ -188,6 +185,23 @@ const WorkoutScreen = ({ navigation }) => {
         }
       ]
     );
+  };
+
+  const handleStartWorkout = async () => {
+    try {
+      const workoutName = `Workout ${new Date().toLocaleDateString()}`;
+      const workoutId = await startWorkout(workoutName);
+      
+      if (workoutId) {
+        console.log('Workout started successfully:', workoutId);
+        // Workout state will update automatically and UI will re-render
+      } else {
+        Alert.alert('Error', 'Failed to start workout. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error starting workout:', error);
+      Alert.alert('Error', 'Failed to start workout. Please try again.');
+    }
   };
 
   const calculatePlates = (targetWeight) => {
@@ -542,7 +556,7 @@ const WorkoutScreen = ({ navigation }) => {
         <Text style={styles.noWorkoutText}>No active workout</Text>
         <TouchableOpacity
           style={styles.startWorkoutButton}
-          onPress={() => navigation.navigate('Home')}
+          onPress={handleStartWorkout}
         >
           <Text style={styles.startWorkoutButtonText}>Start a Workout</Text>
         </TouchableOpacity>

@@ -9,16 +9,26 @@ import {
   Modal,
   TextInput,
   FlatList,
-  Dimensions
+  Dimensions,
+  StatusBar
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useWorkout } from '../contexts/WorkoutContext';
+import { useAuth } from '../contexts/AuthContext';
 import DatabaseManager from '../utils/database';
+import { formatDate } from '../utils/dateUtils';
+import { formatDateShort, formatWorkoutDate, getRelativeTime } from '../utils/dateFormatter';
+import THEME from '../constants/theme';
+import EnhancedButton from '../components/EnhancedButton';
+
+import EnhancedCard from '../components/EnhancedCard';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
   const { state, startWorkout, formatTime, completeWorkout } = useWorkout();
+  const { user } = useAuth();
   const [recentWorkouts, setRecentWorkouts] = useState([]);
   const [workoutTemplates, setWorkoutTemplates] = useState([]);
   const [showNewWorkoutModal, setShowNewWorkoutModal] = useState(false);
@@ -29,35 +39,61 @@ const HomeScreen = ({ navigation }) => {
     totalVolume: 0,
     favoriteExercise: 'None'
   });
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
 
   useEffect(() => {
     loadDashboardData();
-  }, [state.dbInitialized]);
+  }, [state.dbInitialized, user]);
+
+  useEffect(() => {
+    checkIfNewUser();
+  }, [user]);
+
+
 
   const loadDashboardData = async () => {
-    if (!state.dbInitialized) return;
+    if (!state.dbInitialized || !user) return;
 
+    setIsLoading(true);
     try {
-      // Load recent workouts
-      const recent = await DatabaseManager.getWorkoutHistory(5);
+      const userId = user.id || 1; // Get current user ID
+      
+      // Load recent workouts for current user
+      const recent = await DatabaseManager.getWorkoutHistory(userId, 5);
       setRecentWorkouts(recent);
 
       // Load workout templates
       const templates = await DatabaseManager.getWorkoutTemplates();
       setWorkoutTemplates(templates);
 
-      // Calculate stats
-      const allWorkouts = await DatabaseManager.getWorkoutHistory(1000);
+      // Calculate stats for current user
+      const allWorkouts = await DatabaseManager.getWorkoutHistory(userId, 1000);
+      
       const thisWeek = getThisWeekWorkouts(allWorkouts);
+      const totalVolume = await calculateTotalVolume(allWorkouts);
+      const favoriteExercise = await getFavoriteExercise(userId);
+      
+      console.log('Loading stats for user:', userId, {
+        totalWorkouts: allWorkouts.length,
+        thisWeekWorkouts: thisWeek.length,
+        totalVolume,
+        favoriteExercise
+      });
       
       setStats({
         totalWorkouts: allWorkouts.length,
         thisWeekWorkouts: thisWeek.length,
-        totalVolume: calculateTotalVolume(allWorkouts),
-        favoriteExercise: await getFavoriteExercise()
+        totalVolume,
+        favoriteExercise
       });
     } catch (error) {
       console.error('Error loading dashboard data:', error);
+      setError('Could not load dashboard data. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -68,19 +104,71 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const calculateTotalVolume = async (workouts) => {
-    let totalVolume = 0;
-    // This would need to be calculated from sets data
-    // For now, return a placeholder
-    return totalVolume;
+    try {
+      let totalVolume = 0;
+      for (const workout of workouts) {
+        // Calculate volume from sets (weight * reps)
+        const sets = await DatabaseManager.getAllAsync(
+          `SELECT s.weight, s.reps FROM sets s 
+           JOIN workout_exercises we ON s.workout_exercise_id = we.id 
+           WHERE we.workout_id = ? AND s.is_completed = 1`,
+          [workout.id]
+        );
+        
+        for (const set of sets) {
+          totalVolume += (set.weight || 0) * (set.reps || 0);
+        }
+      }
+      return Math.round(totalVolume);
+    } catch (error) {
+      console.error('Error calculating total volume:', error);
+      return 0;
+    }
   };
 
-  const getFavoriteExercise = async () => {
-    // This would query the most frequently used exercise
-    return 'Bench Press';
+  const getFavoriteExercise = async (userId) => {
+    try {
+      // Get the most frequently used exercise for current user
+      const result = await DatabaseManager.getFirstAsync(
+        `SELECT e.name, COUNT(*) as count 
+         FROM workout_exercises we 
+         JOIN exercises e ON we.exercise_id = e.id 
+         JOIN workouts w ON we.workout_id = w.id
+         WHERE w.user_id = ?
+         GROUP BY e.id, e.name 
+         ORDER BY count DESC 
+         LIMIT 1`,
+        [userId]
+      );
+      return result?.name || 'None';
+    } catch (error) {
+      console.error('Error getting favorite exercise:', error);
+      return 'None';
+    }
+  };
+
+  const checkIfNewUser = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const newUserStatus = await DatabaseManager.isNewUser(user.id);
+      setIsNewUser(newUserStatus);
+      
+      // If user has completed at least one workout, mark them as returning
+      if (newUserStatus) {
+        const workouts = await DatabaseManager.getWorkoutHistory(user.id, 1);
+        if (workouts.length > 0) {
+          await DatabaseManager.markUserAsReturning(user.id);
+          setIsNewUser(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking new user status:', error);
+    }
   };
 
   const handleStartWorkout = async (templateId = null) => {
-    const name = workoutName || `Workout ${new Date().toLocaleDateString()}`;
+    const name = workoutName || `Workout - ${formatWorkoutDate(new Date())}`;
     const workoutId = await startWorkout(name, templateId);
     
     if (workoutId) {
@@ -93,7 +181,7 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleQuickStart = () => {
-    setWorkoutName(`Quick Workout ${new Date().toLocaleDateString()}`);
+    setWorkoutName(`Quick Workout - ${formatWorkoutDate(new Date())}`);
     handleStartWorkout();
   };
 
@@ -101,7 +189,11 @@ const HomeScreen = ({ navigation }) => {
     if (!state.activeWorkout) return null;
 
     return (
-      <View style={styles.activeWorkoutCard}>
+      <EnhancedCard 
+        gradient={true}
+        gradientColors={THEME.colors.gradients.primary}
+        style={styles.activeWorkoutCard}
+      >
         <View style={styles.activeWorkoutHeader}>
           <Text style={styles.activeWorkoutTitle}>Active Workout</Text>
           <Text style={styles.activeWorkoutTime}>
@@ -112,51 +204,60 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.activeWorkoutName}>{state.activeWorkout.name}</Text>
         
         <View style={styles.activeWorkoutStats}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{state.workoutExercises.length}</Text>
-            <Text style={styles.statLabel}>Exercises</Text>
+          <View style={styles.activeWorkoutStatItem}>
+            <Text style={styles.activeWorkoutStatNumber}>{state.workoutExercises.length}</Text>
+            <Text style={styles.activeWorkoutStatLabel}>Exercises</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
+          <View style={styles.activeWorkoutStatItem}>
+            <Text style={styles.activeWorkoutStatNumber}>
               {Object.values(state.exerciseSets).flat().length}
             </Text>
-            <Text style={styles.statLabel}>Sets</Text>
+            <Text style={styles.activeWorkoutStatLabel}>Sets</Text>
           </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>
+          <View style={styles.activeWorkoutStatItem}>
+            <Text style={styles.activeWorkoutStatNumber}>
               {Object.values(state.exerciseSets).flat().reduce((total, set) => 
                 total + (set.weight * set.reps), 0
-              ).toLocaleString()}
+              ).toLocaleString()} lbs
             </Text>
-            <Text style={styles.statLabel}>Volume</Text>
+            <Text style={styles.activeWorkoutStatLabel}>Volume</Text>
           </View>
         </View>
 
         <View style={styles.activeWorkoutButtons}>
-          <TouchableOpacity
-            style={styles.continueButton}
-            onPress={() => navigation.navigate('Workout')}
-          >
-            <Text style={styles.continueButtonText}>Continue</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonWrapper}>
+            <EnhancedButton
+              title="Continue"
+              variant="secondary"
+              size="medium"
+              icon="play-arrow"
+              onPress={() => navigation.navigate('Workout')}
+              style={styles.buttonStyle}
+            />
+          </View>
           
-          <TouchableOpacity
-            style={styles.finishButton}
-            onPress={() => {
-              Alert.alert(
-                'Finish Workout',
-                'Are you sure you want to finish this workout?',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Finish', onPress: completeWorkout }
-                ]
-              );
-            }}
-          >
-            <Text style={styles.finishButtonText}>Finish</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonWrapper}>
+            <EnhancedButton
+              title="Finish"
+              variant="outline"
+              size="medium"
+              icon="check"
+              onPress={() => {
+                Alert.alert(
+                  'Finish Workout',
+                  'Are you sure you want to finish this workout?',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Finish', onPress: completeWorkout }
+                  ]
+                );
+              }}
+              style={styles.buttonStyle}
+              textStyle={styles.finishButtonText}
+            />
+          </View>
         </View>
-      </View>
+      </EnhancedCard>
     );
   };
 
@@ -164,25 +265,34 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.quickActionsContainer}>
       <Text style={styles.sectionTitle}>Quick Start</Text>
       
-      <TouchableOpacity
-        style={styles.quickStartButton}
+      <EnhancedButton
+        title="Start Empty Workout"
+        variant="primary"
+        size="large"
+        icon="play-arrow"
+        gradient={true}
         onPress={handleQuickStart}
         disabled={!!state.activeWorkout}
-      >
-        <Icon name="play-arrow" size={24} color="#fff" />
-        <Text style={styles.quickStartText}>Start Empty Workout</Text>
-      </TouchableOpacity>
+        style={styles.quickStartButton}
+      />
 
       {workoutTemplates.length > 0 && (
-        <TouchableOpacity
-          style={styles.templateButton}
+        <EnhancedButton
+          title="Start from Template"
+          variant="secondary"
+          size="large"
+          icon="library-books"
           onPress={() => setShowNewWorkoutModal(true)}
           disabled={!!state.activeWorkout}
-        >
-          <Icon name="library-books" size={24} color="#007AFF" />
-          <Text style={styles.templateButtonText}>Start from Template</Text>
-        </TouchableOpacity>
+          style={styles.templateButton}
+        />
       )}
+    </View>
+  );
+
+  const renderStatSkeleton = () => (
+    <View style={[styles.statCard, { backgroundColor: THEME.colors.gray800 }]}>
+      <View style={{ width: '100%', height: '100%', position: 'absolute', backgroundColor: 'rgba(255,255,255,0.1)' }} />
     </View>
   );
 
@@ -190,27 +300,53 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.statsContainer}>
       <Text style={styles.sectionTitle}>Your Progress</Text>
       
+      {isLoading ? (
+        <View style={styles.statsGrid}>
+          {renderStatSkeleton()}
+          {renderStatSkeleton()}
+          {renderStatSkeleton()}
+          {renderStatSkeleton()}
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <EnhancedButton title="Retry" onPress={loadDashboardData} variant="primary" />
+        </View>
+      ) : (
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
+          <Icon name="fitness-center" size={24} color={THEME.colors.primary} style={styles.statIcon} />
           <Text style={styles.statNumber}>{stats.totalWorkouts}</Text>
           <Text style={styles.statLabel}>Total Workouts</Text>
         </View>
         
         <View style={styles.statCard}>
+          <Icon name="calendar-today" size={24} color={THEME.colors.primary} style={styles.statIcon} />
           <Text style={styles.statNumber}>{stats.thisWeekWorkouts}</Text>
           <Text style={styles.statLabel}>This Week</Text>
         </View>
         
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.totalVolume.toLocaleString()}</Text>
-          <Text style={styles.statLabel}>Total Volume</Text>
+          <Icon name="trending-up" size={24} color={THEME.colors.primary} style={styles.statIcon} />
+          <Text style={styles.statNumber}>
+            {stats.totalVolume > 1000 ? `${(stats.totalVolume / 1000).toFixed(1)}k` : stats.totalVolume.toLocaleString()}
+          </Text>
+          <Text style={styles.statLabel}>Total Volume (lbs)</Text>
         </View>
         
         <View style={styles.statCard}>
-          <Text style={styles.statNumber}>{stats.favoriteExercise}</Text>
+          <Icon name="star" size={24} color={THEME.colors.primary} style={styles.statIcon} />
+          <Text style={[styles.statNumber, { 
+            fontSize: stats.favoriteExercise.length > 12 ? 
+              THEME.typography.fontSize['2xl'] : 
+              THEME.typography.fontSize['4xl'] 
+          }]}>
+            {stats.favoriteExercise}
+          </Text>
           <Text style={styles.statLabel}>Top Exercise</Text>
         </View>
       </View>
+      )}
     </View>
   );
 
@@ -238,12 +374,12 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.workoutHistoryLeft}>
                 <Text style={styles.workoutHistoryName}>{item.name}</Text>
                 <Text style={styles.workoutHistoryDate}>
-                  {new Date(item.date).toLocaleDateString()}
+                  {getRelativeTime(item.date)}
                 </Text>
               </View>
               <View style={styles.workoutHistoryRight}>
                 <Text style={styles.workoutHistoryDuration}>
-                  {formatTime(item.duration)}
+                  Duration: {formatTime(item.duration)}
                 </Text>
                 <Icon name="chevron-right" size={20} color="#999" />
               </View>
@@ -312,177 +448,189 @@ const HomeScreen = ({ navigation }) => {
   );
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
-        <Text style={styles.welcomeText}>Welcome back!</Text>
-        <Text style={styles.dateText}>{new Date().toDateString()}</Text>
-      </View>
+    <>
+      <StatusBar barStyle="light-content" />
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Text style={styles.welcomeText}>
+            {isNewUser ? `Welcome to Fitera, ${user?.name || user?.username || 'friend'}!` : 'Welcome back!'}
+          </Text>
+          <Text style={styles.dateText}>{formatDate(new Date())}</Text>
+        </View>
 
-      {renderActiveWorkout()}
-      {!state.activeWorkout && renderQuickActions()}
-      {renderStats()}
-      {renderRecentWorkouts()}
-      {renderNewWorkoutModal()}
-    </ScrollView>
+        {renderActiveWorkout()}
+
+        {renderStats()}
+
+        
+
+        {!state.activeWorkout && renderQuickActions()}
+        {renderRecentWorkouts()}
+        {renderNewWorkoutModal()}
+      </ScrollView>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
+    padding: THEME.spacing.xl,
+    paddingTop: THEME.spacing['6xl'],
   },
   welcomeText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontSize: THEME.typography.fontSize['4xl'],
+    fontWeight: THEME.typography.fontWeight.bold,
+    color: THEME.colors.black,
+    letterSpacing: THEME.typography.letterSpacing.tight,
   },
   dateText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
+    fontSize: THEME.typography.fontSize.lg,
+    color: THEME.colors.gray600,
+    marginTop: THEME.spacing.xs,
+    fontWeight: THEME.typography.fontWeight.medium,
   },
-  activeWorkoutCard: {
-    backgroundColor: '#007AFF',
-    margin: 20,
-    borderRadius: 16,
-    padding: 20,
+activeWorkoutCard: {
+    margin: THEME.spacing.xl,
+    marginTop: THEME.spacing.lg,
+    padding: 0,
   },
   activeWorkoutHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: THEME.spacing.md,
   },
   activeWorkoutTitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: THEME.typography.fontSize.sm,
+    fontWeight: THEME.typography.fontWeight.semibold,
+    letterSpacing: THEME.typography.letterSpacing.widest,
+    textTransform: 'uppercase',
   },
   activeWorkoutTime: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: THEME.colors.white,
+    fontSize: THEME.typography.fontSize.xl,
+    fontWeight: THEME.typography.fontWeight.bold,
   },
   activeWorkoutName: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    color: THEME.colors.white,
+    fontSize: THEME.typography.fontSize['2xl'],
+    fontWeight: THEME.typography.fontWeight.bold,
+    marginBottom: THEME.spacing.lg,
+    letterSpacing: THEME.typography.letterSpacing.tight,
   },
-  activeWorkoutStats: {
+activeWorkoutStats: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    marginBottom: THEME.spacing.lg,
+    paddingHorizontal: THEME.spacing.md,
+  },
+activeWorkoutStatItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  activeWorkoutStatNumber: {
+    color: THEME.colors.white,
+    fontSize: THEME.typography.fontSize['2xl'],
+    fontWeight: THEME.typography.fontWeight.bold,
+  },
+  activeWorkoutStatLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: THEME.typography.fontSize.xs,
+    marginTop: THEME.spacing.xs,
+    fontWeight: THEME.typography.fontWeight.medium,
+    letterSpacing: THEME.typography.letterSpacing.wide,
+    textTransform: 'uppercase',
   },
   statItem: {
     alignItems: 'center',
   },
-  statNumber: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  statLabel: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  activeWorkoutButtons: {
+activeWorkoutButtons: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'stretch',
+    gap: THEME.spacing.md,
+    marginTop: THEME.spacing.md,
+    height: 48, // Fixed container height
   },
-  continueButton: {
+  buttonWrapper: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+    height: 48,
+    overflow: 'hidden', // Prevent buttons from growing beyond wrapper
   },
-  continueButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  finishButton: {
+  buttonStyle: {
+    height: 48,
+    minHeight: 48,
+    maxHeight: 48,
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    margin: 0,
+    padding: 0,
   },
   finishButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: THEME.colors.white,
   },
   quickActionsContainer: {
-    marginHorizontal: 20,
-    marginBottom: 24,
+    marginHorizontal: THEME.spacing.xl,
+    marginBottom: THEME.spacing['2xl'],
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 12,
+    fontSize: THEME.typography.fontSize['2xl'],
+    fontWeight: THEME.typography.fontWeight.bold,
+    color: THEME.colors.black,
+    marginBottom: THEME.spacing.lg,
+    letterSpacing: THEME.typography.letterSpacing.tight,
   },
   quickStartButton: {
-    backgroundColor: '#007AFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    gap: 8,
-  },
-  quickStartText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    marginBottom: THEME.spacing.md,
   },
   templateButton: {
-    backgroundColor: '#fff',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    gap: 8,
-  },
-  templateButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
+    // Styles handled by EnhancedButton
   },
   statsContainer: {
-    marginHorizontal: 20,
-    marginBottom: 24,
+    marginHorizontal: THEME.spacing.xl,
+    marginBottom: THEME.spacing['2xl'],
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: THEME.spacing.md,
   },
   statCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    width: (width - 56) / 2,
+    backgroundColor: THEME.colors.white,
+    borderRadius: THEME.radius.xl,
+    padding: THEME.spacing.lg,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    flexBasis: '48%', // Two cards per row with gap
+    flexGrow: 1,
+    minHeight: 140,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 3,
+  },
+  statIcon: {
+    alignSelf: 'flex-end',
+    color: THEME.colors.primary,
+    opacity: 0.8,
+  },
+  statNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: THEME.colors.text,
+    marginBottom: THEME.spacing.xs,
+  },
+  statLabel: {
+    fontSize: THEME.typography.fontSize.base,
+    color: THEME.colors.gray700,
+    textAlign: 'center',
+    fontWeight: THEME.typography.fontWeight.semibold,
+    letterSpacing: THEME.typography.letterSpacing.wide,
   },
   recentWorkoutsContainer: {
     marginHorizontal: 20,
@@ -627,6 +775,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 2,
+  },
+  skeletonIcon: {
+    backgroundColor: THEME.colors.gray300,
+    position: 'absolute',
+    top: THEME.spacing.md,
+    right: THEME.spacing.md,
+  },
+  skeletonText: {
+    backgroundColor: THEME.colors.gray300,
+    borderRadius: THEME.radius.md,
   },
 });
 
