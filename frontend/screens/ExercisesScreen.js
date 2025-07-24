@@ -264,16 +264,9 @@ const ExercisesScreen = () => {
         />
       </View>
 
-      {/* Category Tabs */}
+      {/* Category Tabs - Multi-Row Layout */}
       <View style={styles.categoryTabsContainer}>
-        <ScrollView
-          ref={categoryScrollViewRef}
-          horizontal
-          showsHorizontalScrollIndicator={true}
-          style={styles.categoryTabs}
-          contentContainerStyle={styles.categoryTabsContent}
-          decelerationRate="normal"
-        >
+        <View style={styles.categoryTabsWrapper}>
           {categories.length > 0 ? categories.map((item, index) => (
             <TouchableOpacity
               key={item.id.toString()}
@@ -284,20 +277,12 @@ const ExercisesScreen = () => {
               onPress={() => {
                 console.log('📊 Category selected:', item.name);
                 setSelectedCategory(item.name);
-                // Auto-scroll to ensure selected tab is visible
-                if (categoryScrollViewRef.current && index > 2) {
-                  const scrollPosition = (index - 2) * 92; // More accurate calculation
-                  categoryScrollViewRef.current.scrollTo({
-                    x: scrollPosition,
-                    animated: true
-                  });
-                }
               }}
               activeOpacity={0.7}
             >
               <MaterialIcons
                 name={item.icon || 'fitness-center'}
-                size={16}
+                size={14}
                 color={selectedCategory === item.name ? '#fff' : '#007AFF'}
                 style={styles.tabIcon}
               />
@@ -309,9 +294,9 @@ const ExercisesScreen = () => {
               </Text>
             </TouchableOpacity>
           )) : (
-            <Text style={{ padding: 16, color: '#999' }}>No categories loaded</Text>
+            <Text style={styles.noCategoriesText}>No categories loaded</Text>
           )}
-        </ScrollView>
+        </View>
       </View>
 
       {/* Exercise List */}
@@ -523,41 +508,39 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   categoryTabsContainer: {
-    position: 'relative',
-    height: 60,
-    marginBottom: 8,
-    backgroundColor: 'transparent',
-  },
-  categoryTabs: {
-    height: 60,
-  },
-  categoryTabsContent: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    paddingRight: 24,
+    paddingVertical: 12,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  categoryTabsWrapper: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    gap: 8,
   },
   categoryTab: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    marginRight: 10,
-    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#007AFF',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 1,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-    minWidth: 90,
-    height: 44,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    minWidth: 70,
+    height: 36,
   },
   selectedCategoryTab: {
     backgroundColor: '#007AFF',
@@ -575,6 +558,12 @@ const styles = StyleSheet.create({
   },
   tabIcon: {
     // Icon styling handled in component
+  },
+  noCategoriesText: {
+    padding: 16,
+    color: '#999',
+    fontSize: 16,
+    textAlign: 'center',
   },
   exerciseList: {
     padding: 16,
