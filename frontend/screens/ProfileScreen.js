@@ -685,8 +685,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.lg,
     paddingTop: 60,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -703,7 +703,7 @@ const styles = StyleSheet.create({
   },
   profileSection: {
     backgroundColor: '#fff',
-    padding: 24,
+    padding: THEME.spacing.xl,
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
@@ -748,8 +748,8 @@ const styles = StyleSheet.create({
   },
   statsSection: {
     backgroundColor: '#fff',
-    padding: 20,
-    marginBottom: 20,
+    padding: THEME.spacing.xl,
+    marginBottom: THEME.spacing.xl,
   },
   sectionTitle: {
     fontSize: 18,
@@ -783,13 +783,13 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#fff',
-    marginBottom: 20,
+    marginBottom: THEME.spacing.xl,
   },
   settingsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.lg,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -810,7 +810,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   footer: {
-    padding: 24,
+    padding: THEME.spacing.xl,
     alignItems: 'center',
   },
   footerText: {
@@ -825,8 +825,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.lg,
     paddingTop: 60,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -848,7 +848,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    padding: 16,
+    padding: THEME.spacing.xl,
   },
   inputGroup: {
     marginBottom: 20,

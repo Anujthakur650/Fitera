@@ -13,6 +13,7 @@ import {
   Dimensions
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import THEME from '../constants/theme';
 import { useWorkout } from '../contexts/WorkoutContext';
 import { useAuth } from '../contexts/FirebaseAuthContext';
 import analyticsEngine from '../utils/firebaseAnalytics';
@@ -75,7 +76,7 @@ const AnalyticsScreen = () => {
     <View style={styles.header}>
       <Text style={styles.headerTitle}>Analytics</Text>
       <TouchableOpacity onPress={loadAnalytics} style={styles.refreshButton}>
-        <MaterialIcons name="refresh" size={24} color="#007AFF" />
+        <MaterialIcons name="refresh" size={24} color={THEME.colors.primary} />
       </TouchableOpacity>
     </View>
   );
@@ -167,8 +168,8 @@ const AnalyticsScreen = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Muscle Group Balance</Text>
-          <TouchableOpacity onPress={() => showDetail('muscleBalance', analytics.muscleBalance)}>
-            <MaterialIcons name="info-outline" size={20} color="#666" />
+            <TouchableOpacity onPress={() => showDetail('muscleBalance', analytics.muscleBalance)}>
+            <MaterialIcons name="info-outline" size={20} color={THEME.colors.gray600} />
           </TouchableOpacity>
         </View>
 
@@ -194,7 +195,7 @@ const AnalyticsScreen = () => {
 
         {imbalances && imbalances.length > 0 && (
           <View style={styles.imbalanceAlert}>
-            <MaterialIcons name="warning" size={16} color="#ff9500" />
+            <MaterialIcons name="warning" size={16} color={THEME.colors.accent} />
             <Text style={styles.imbalanceText}>
               {imbalances.length} muscle group imbalance{imbalances.length > 1 ? 's' : ''} detected
             </Text>
@@ -228,8 +229,8 @@ const AnalyticsScreen = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Strength Ratios</Text>
-          <TouchableOpacity onPress={() => showDetail('strengthRatios', analytics.strengthRatios)}>
-            <MaterialIcons name="info-outline" size={20} color="#666" />
+            <TouchableOpacity onPress={() => showDetail('strengthRatios', analytics.strengthRatios)}>
+            <MaterialIcons name="info-outline" size={20} color={THEME.colors.gray600} />
           </TouchableOpacity>
         </View>
 
@@ -289,8 +290,8 @@ const AnalyticsScreen = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Personal Records</Text>
-          <TouchableOpacity onPress={() => showDetail('personalRecords', analytics.personalRecords)}>
-            <MaterialIcons name="info-outline" size={20} color="#666" />
+            <TouchableOpacity onPress={() => showDetail('personalRecords', analytics.personalRecords)}>
+            <MaterialIcons name="info-outline" size={20} color={THEME.colors.gray600} />
           </TouchableOpacity>
         </View>
 
@@ -334,8 +335,8 @@ const AnalyticsScreen = () => {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Workout Frequency</Text>
-          <TouchableOpacity onPress={() => showDetail('frequency', analytics.frequencyAnalysis)}>
-            <MaterialIcons name="info-outline" size={20} color="#666" />
+            <TouchableOpacity onPress={() => showDetail('frequency', analytics.frequencyAnalysis)}>
+            <MaterialIcons name="info-outline" size={20} color={THEME.colors.gray600} />
           </TouchableOpacity>
         </View>
 
@@ -585,8 +586,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.lg,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
@@ -604,9 +605,9 @@ const styles = StyleSheet.create({
   },
   timeframeContainer: {
     backgroundColor: '#fff',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingVertical: THEME.spacing.lg,
+    paddingHorizontal: THEME.spacing.xl,
+    marginBottom: THEME.spacing.lg,
   },
   timeframeScroll: {
     marginTop: 12,
@@ -640,9 +641,9 @@ const styles = StyleSheet.create({
   },
   section: {
     backgroundColor: '#fff',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
+    marginBottom: THEME.spacing.lg,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.xl,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -652,9 +653,9 @@ const styles = StyleSheet.create({
   },
   scoreContainer: {
     backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    marginBottom: 16,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.xl,
+    marginBottom: THEME.spacing.lg,
   },
   scoreCard: {
     alignItems: 'center',
@@ -904,8 +905,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.lg,
     alignItems: 'center',
   },
   footerText: {

@@ -694,7 +694,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.lg,
   },
   headerCenter: {
     flex: 1,
@@ -754,7 +755,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   exercisesList: {
-    padding: 16,
+    paddingHorizontal: THEME.spacing.xl,
+    paddingVertical: THEME.spacing.lg,
   },
   exerciseCard: {
     backgroundColor: THEME.colors.white,
@@ -770,7 +772,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: THEME.spacing.lg,
+    paddingVertical: THEME.spacing.md,
   },
   exerciseInfo: {
     flex: 1,
