@@ -14,8 +14,9 @@ import {
   Vibration
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import THEME from '../constants/theme';
 import { useWorkout } from '../contexts/WorkoutContext';
-import DatabaseManager from '../utils/database';
+import database from '../utils/firebaseDatabase';
 import { formatWorkoutDate } from '../utils/dateFormatter';
 
 const WorkoutScreen = ({ navigation }) => {
@@ -86,8 +87,8 @@ const WorkoutScreen = ({ navigation }) => {
 
   const loadExercises = async () => {
     try {
-      const allExercises = await DatabaseManager.getExercises();
-      const allCategories = await DatabaseManager.getExerciseCategories();
+      const allExercises = await database.getExercises();
+      const allCategories = await database.getExerciseCategories();
       setExercises(allExercises);
       setCategories(allCategories);
     } catch (error) {
@@ -175,10 +176,8 @@ const WorkoutScreen = ({ navigation }) => {
           onPress: async () => {
             // Save workout notes if any
             if (workoutNotes.trim()) {
-              await DatabaseManager.runAsync(
-                'UPDATE workouts SET notes = ? WHERE id = ?',
-                [workoutNotes, state.activeWorkout.id]
-              );
+              // For Firebase, we'll update the workout document with notes
+              await database.updateWorkoutNotes(state.activeWorkout.id, workoutNotes);
             }
             await completeWorkout();
             navigation.navigate('Home');
@@ -230,20 +229,13 @@ const WorkoutScreen = ({ navigation }) => {
 
   const loadPreviousWorkoutData = async (exerciseId) => {
     try {
-      const lastWorkout = await DatabaseManager.getFirstAsync(`
-        SELECT s.weight, s.reps, s.set_number, w.date
-        FROM sets s
-        JOIN workout_exercises we ON s.workout_exercise_id = we.id
-        JOIN workouts w ON we.workout_id = w.id
-        WHERE we.exercise_id = ? AND w.is_completed = 1 AND w.id != ?
-        ORDER BY w.date DESC, s.set_number ASC
-        LIMIT 1
-      `, [exerciseId, state.activeWorkout.id]);
+      // For Firebase, we need to get the last workout data differently
+      const lastWorkoutData = await database.getLastWorkoutDataForExercise(exerciseId, state.activeWorkout.id);
       
-      if (lastWorkout) {
+      if (lastWorkoutData) {
         setPreviousWorkoutData(prev => ({
           ...prev,
-          [exerciseId]: lastWorkout
+          [exerciseId]: lastWorkoutData
         }));
       }
     } catch (error) {
@@ -304,7 +296,7 @@ const WorkoutScreen = ({ navigation }) => {
             style={styles.notesButton}
             onPress={() => setShowWorkoutNotesModal(true)}
           >
-            <Icon name="note-add" size={16} color="#007AFF" />
+            <Icon name="note-add" size={16} color={THEME.colors.primary} />
             <Text style={styles.notesButtonText}>Notes</Text>
           </TouchableOpacity>
         </View>
@@ -314,7 +306,7 @@ const WorkoutScreen = ({ navigation }) => {
             <Text style={styles.restTimerLabel}>Rest</Text>
             <Text style={styles.restTimerTime}>{formatTime(restTimeRemaining)}</Text>
             <TouchableOpacity onPress={clearRestTimer}>
-              <Icon name="close" size={20} color="#fff" />
+              <Icon name="close" size={20} color={THEME.colors.white} />
             </TouchableOpacity>
           </View>
         )}
@@ -353,7 +345,7 @@ const WorkoutScreen = ({ navigation }) => {
                 setShowPlateCalculator(true);
               }}
             >
-              <Icon name="calculate" size={14} color="#666" />
+              <Icon name="calculate" size={14} color={THEME.colors.gray600} />
             </TouchableOpacity>
           </View>
           {previousData && (
@@ -372,7 +364,7 @@ const WorkoutScreen = ({ navigation }) => {
               handleSetInputChange(exerciseId, 'reps', set.reps.toString());
             }}
           >
-            <Icon name="content-copy" size={16} color="#007AFF" />
+            <Icon name="content-copy" size={16} color={THEME.colors.primary} />
           </TouchableOpacity>
           
           <TouchableOpacity
@@ -406,7 +398,7 @@ const WorkoutScreen = ({ navigation }) => {
             <Icon 
               name={isExpanded ? "expand-less" : "expand-more"} 
               size={24} 
-              color="#666" 
+              color={THEME.colors.gray600} 
             />
           </View>
         </TouchableOpacity>
@@ -467,7 +459,7 @@ const WorkoutScreen = ({ navigation }) => {
                 style={styles.addSetButton}
                 onPress={() => handleAddSet(exercise.id)}
               >
-                <Icon name="add" size={24} color="#007AFF" />
+                <Icon name="add" size={24} color={THEME.colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -492,7 +484,7 @@ const WorkoutScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.searchContainer}>
-          <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
+          <Icon name="search" size={20} color={THEME.colors.gray600} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search exercises..."
@@ -542,7 +534,7 @@ const WorkoutScreen = ({ navigation }) => {
                   <Text style={styles.exerciseListEquipment}>{item.equipment}</Text>
                 )}
               </View>
-              <Icon name="add" size={24} color="#007AFF" />
+                <Icon name="add" size={24} color={THEME.colors.primary} />
             </TouchableOpacity>
           )}
           style={styles.exerciseList}
@@ -574,7 +566,7 @@ const WorkoutScreen = ({ navigation }) => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {state.workoutExercises.length === 0 ? (
           <View style={styles.emptyState}>
-            <Icon name="fitness-center" size={64} color="#ccc" />
+            <Icon name="fitness-center" size={64} color={THEME.colors.gray400} />
             <Text style={styles.emptyStateTitle}>No exercises yet</Text>
             <Text style={styles.emptyStateText}>
               Add your first exercise to get started
@@ -597,7 +589,7 @@ const WorkoutScreen = ({ navigation }) => {
             setShowExerciseModal(true);
           }}
         >
-          <Icon name="add" size={24} color="#007AFF" />
+          <Icon name="add" size={24} color={THEME.colors.primary} />
           <Text style={styles.addExerciseText}>Add Exercise</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -691,12 +683,12 @@ const WorkoutScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: THEME.colors.gray300,
   },
   headerTop: {
     flexDirection: 'row',
@@ -715,11 +707,11 @@ const styles = StyleSheet.create({
   },
   workoutTimer: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginTop: 2,
   },
   finishText: {
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -732,12 +724,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   restTimerLabel: {
-    color: '#fff',
+    color: THEME.colors.white,
     fontSize: 14,
     fontWeight: '600',
   },
   restTimerTime: {
-    color: '#fff',
+    color: THEME.colors.white,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -752,12 +744,12 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#999',
+    color: THEME.colors.gray500,
     marginTop: 16,
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#999',
+    color: THEME.colors.gray500,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -765,7 +757,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   exerciseCard: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderRadius: 12,
     marginBottom: 12,
     shadowColor: '#000',
@@ -790,7 +782,7 @@ const styles = StyleSheet.create({
   },
   exerciseMuscles: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginTop: 2,
   },
   exerciseStats: {
@@ -798,7 +790,7 @@ const styles = StyleSheet.create({
   },
   exerciseSetCount: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginBottom: 4,
   },
   exerciseContent: {
@@ -863,13 +855,13 @@ const styles = StyleSheet.create({
   },
   setInput: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
     padding: 12,
     borderRadius: 8,
     fontSize: 16,
     textAlign: 'center',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: THEME.colors.gray300,
   },
   warmupButton: {
     width: 40,
@@ -885,17 +877,17 @@ const styles = StyleSheet.create({
   warmupButtonText: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#666',
+    color: THEME.colors.gray600,
   },
   warmupButtonTextActive: {
-    color: '#fff',
+    color: THEME.colors.white,
   },
   addSetButton: {
     padding: 8,
     marginLeft: 8,
   },
   addExerciseButton: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -903,17 +895,17 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: THEME.colors.primary,
     gap: 8,
   },
   addExerciseText: {
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -922,10 +914,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: THEME.colors.gray300,
   },
   modalCancelText: {
-    color: '#666',
+    color: THEME.colors.gray600,
     fontSize: 16,
   },
   modalTitle: {
@@ -954,22 +946,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   categoryChip: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: THEME.colors.gray200,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
   },
   categoryChipActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: THEME.colors.primary,
   },
   categoryChipText: {
-    color: '#666',
+    color: THEME.colors.gray600,
     fontSize: 14,
     fontWeight: '600',
   },
   categoryChipTextActive: {
-    color: '#fff',
+    color: THEME.colors.white,
   },
   exerciseList: {
     flex: 1,
@@ -992,12 +984,12 @@ const styles = StyleSheet.create({
   },
   exerciseListMuscles: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginTop: 2,
   },
   exerciseListEquipment: {
     fontSize: 12,
-    color: '#999',
+    color: THEME.colors.gray500,
     marginTop: 2,
   },
   noWorkoutContainer: {
@@ -1009,17 +1001,17 @@ const styles = StyleSheet.create({
   noWorkoutText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#999',
+    color: THEME.colors.gray500,
     marginBottom: 20,
   },
   startWorkoutButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: THEME.colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   startWorkoutButtonText: {
-    color: '#fff',
+    color: THEME.colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -1030,9 +1022,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: THEME.colors.gray300,
   },
   statItem: {
     alignItems: 'center',
@@ -1041,11 +1033,11 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: THEME.colors.primary,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginTop: 2,
   },
   notesButton: {
@@ -1054,14 +1046,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: THEME.colors.primary,
   },
   notesButtonText: {
     marginLeft: 4,
     fontSize: 12,
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontWeight: '500',
   },
   performanceBadge: {
@@ -1091,12 +1083,12 @@ const styles = StyleSheet.create({
   },
   previousSetData: {
     fontSize: 11,
-    color: '#999',
+    color: THEME.colors.gray500,
     marginTop: 2,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1105,9 +1097,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingTop: 60,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   modalTitle: {
     fontSize: 18,
@@ -1116,11 +1108,11 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: {
     fontSize: 16,
-    color: '#666',
+    color: THEME.colors.gray600,
   },
   modalSaveButton: {
     fontSize: 16,
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontWeight: '600',
   },
   modalRightSpace: {
@@ -1131,9 +1123,9 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   notesInput: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -1145,11 +1137,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
   },
   plateInputLabel: {
     fontSize: 16,
@@ -1163,20 +1155,20 @@ const styles = StyleSheet.create({
     color: '#333',
     padding: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: THEME.colors.gray300,
     borderRadius: 4,
     textAlign: 'center',
   },
   plateInputUnit: {
     fontSize: 16,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginLeft: 8,
   },
   plateBreakdown: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
     padding: 16,
   },
   plateBreakdownTitle: {
@@ -1191,7 +1183,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: THEME.colors.gray200,
   },
   plateWeight: {
     fontSize: 16,
@@ -1201,13 +1193,13 @@ const styles = StyleSheet.create({
   },
   plateCount: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     flex: 1,
     textAlign: 'center',
   },
   plateTotal: {
     fontSize: 14,
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontWeight: '500',
     flex: 1,
     textAlign: 'right',
