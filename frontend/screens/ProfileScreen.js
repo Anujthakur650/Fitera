@@ -347,7 +347,7 @@ const ProfileScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      <StatusBar barStyle="dark-content" backgroundColor={THEME.colors.gray100} />
       
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
@@ -682,31 +682,31 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   header: {
     paddingHorizontal: THEME.spacing.xl,
     paddingVertical: THEME.spacing.lg,
     paddingTop: 60,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: THEME.colors.gray900,
     textAlign: 'center',
   },
   scrollView: {
     flex: 1,
   },
   profileSection: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     padding: THEME.spacing.xl,
     alignItems: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   avatarContainer: {
     marginBottom: 16,
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: THEME.colors.infoLight,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -724,12 +724,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: THEME.colors.gray900,
     marginBottom: 4,
   },
   memberSince: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginBottom: 16,
   },
   editProfileButton: {
@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   statsSection: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     padding: THEME.spacing.xl,
     marginBottom: THEME.spacing.xl,
   },
@@ -764,7 +764,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: '48%',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -778,11 +778,11 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: '#666',
+    color: THEME.colors.gray600,
     textAlign: 'center',
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     marginBottom: THEME.spacing.xl,
   },
   settingsItem: {
@@ -791,7 +791,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: THEME.spacing.xl,
     paddingVertical: THEME.spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: THEME.colors.gray300,
   },
   settingsIcon: {
     marginRight: 16,
@@ -801,12 +801,12 @@ const styles = StyleSheet.create({
   },
   settingsTitle: {
     fontSize: 16,
-    color: '#333',
+    color: THEME.colors.gray900,
     fontWeight: '500',
   },
   settingsSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginTop: 2,
   },
   footer: {
@@ -815,11 +815,11 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#999',
+    color: THEME.colors.gray500,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -828,18 +828,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: THEME.spacing.xl,
     paddingVertical: THEME.spacing.lg,
     paddingTop: 60,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: THEME.colors.gray900,
   },
   modalCancelButton: {
     fontSize: 16,
-    color: '#666',
+    color: THEME.colors.gray600,
   },
   modalSaveButton: {
     fontSize: 16,
@@ -860,9 +860,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   textInput: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
   },
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: THEME.colors.gray200,
     borderRadius: 8,
     padding: 2,
   },
@@ -886,15 +886,15 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   segmentButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: THEME.colors.primary,
   },
   segmentText: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     fontWeight: '500',
   },
   segmentTextActive: {
-    color: '#fff',
+    color: THEME.colors.white,
   },
   userInfoContainer: {
     flexDirection: 'row',

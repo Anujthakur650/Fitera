@@ -519,7 +519,7 @@ const AnalyticsScreen = () => {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+        <StatusBar barStyle="dark-content" backgroundColor={THEME.colors.gray100} />
         {renderHeader()}
         <View style={styles.loadingContainer}>
           <MaterialIcons name="analytics" size={48} color="#ccc" />
@@ -532,7 +532,7 @@ const AnalyticsScreen = () => {
   if (!analytics) {
     return (
       <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+        <StatusBar barStyle="dark-content" backgroundColor={THEME.colors.gray100} />
         {renderHeader()}
         <View style={styles.emptyContainer}>
           <MaterialIcons name="bar-chart" size={64} color="#ccc" />
@@ -548,7 +548,7 @@ const AnalyticsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f8f9fa" />
+      <StatusBar barStyle="dark-content" backgroundColor={THEME.colors.gray100} />
       {renderHeader()}
       
       <ScrollView 
@@ -580,7 +580,7 @@ const AnalyticsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   header: {
     flexDirection: 'row',
@@ -588,14 +588,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: THEME.spacing.xl,
     paddingVertical: THEME.spacing.lg,
-    backgroundColor: '#fff',
+    paddingTop: 60,
+    backgroundColor: THEME.colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: THEME.colors.gray900,
   },
   refreshButton: {
     padding: 8,
@@ -604,7 +605,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   timeframeContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     paddingVertical: THEME.spacing.lg,
     paddingHorizontal: THEME.spacing.xl,
     marginBottom: THEME.spacing.lg,
@@ -616,31 +617,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
+    minHeight: 44,
   },
   timeframeButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary,
   },
   timeframeButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666',
+    color: THEME.colors.gray600,
   },
   timeframeButtonTextActive: {
-    color: '#fff',
+    color: THEME.colors.white,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: THEME.colors.gray900,
     marginBottom: 16,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     marginBottom: THEME.spacing.lg,
     paddingHorizontal: THEME.spacing.xl,
     paddingVertical: THEME.spacing.xl,
@@ -652,7 +654,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   scoreContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     paddingHorizontal: THEME.spacing.xl,
     paddingVertical: THEME.spacing.xl,
     marginBottom: THEME.spacing.lg,
@@ -671,7 +673,7 @@ const styles = StyleSheet.create({
   scoreRating: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
+    color: THEME.colors.gray600,
     marginTop: 4,
   },
   scoreBreakdown: {
@@ -691,7 +693,7 @@ const styles = StyleSheet.create({
   scoreBar: {
     flex: 1,
     height: 8,
-    backgroundColor: '#e9ecef',
+    backgroundColor: THEME.colors.gray300,
     borderRadius: 4,
     marginHorizontal: 12,
     overflow: 'hidden',
@@ -724,7 +726,7 @@ const styles = StyleSheet.create({
   balanceBar: {
     flex: 1,
     height: 12,
-    backgroundColor: '#e9ecef',
+    backgroundColor: THEME.colors.gray300,
     borderRadius: 6,
     marginHorizontal: 12,
     overflow: 'hidden',
@@ -743,7 +745,7 @@ const styles = StyleSheet.create({
   imbalanceAlert: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3cd',
+    backgroundColor: THEME.colors.warningLight,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -756,11 +758,11 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   recommendationBox: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
     padding: 12,
     borderRadius: 8,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: THEME.colors.primary,
   },
   recommendationTitle: {
     fontSize: 14,
@@ -770,7 +772,7 @@ const styles = StyleSheet.create({
   },
   recommendationText: {
     fontSize: 13,
-    color: '#666',
+    color: THEME.colors.gray600,
     lineHeight: 18,
     marginBottom: 4,
   },
@@ -778,7 +780,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   ratioItem: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
@@ -812,11 +814,11 @@ const styles = StyleSheet.create({
   },
   ratioValues: {
     fontSize: 13,
-    color: '#666',
+    color: THEME.colors.gray600,
   },
   ratioDeviation: {
     fontSize: 13,
-    color: '#666',
+    color: THEME.colors.gray600,
     fontWeight: '500',
   },
   overallBalance: {
@@ -857,7 +859,7 @@ const styles = StyleSheet.create({
   recordCategory: {
     fontSize: 12,
     color: '#666',
-    backgroundColor: '#e9ecef',
+    backgroundColor: THEME.colors.gray300,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -872,17 +874,17 @@ const styles = StyleSheet.create({
   },
   recordLabel: {
     fontSize: 11,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginBottom: 2,
   },
   recordValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
+    color: THEME.colors.gray900,
   },
   recordLastPerformed: {
     fontSize: 12,
-    color: '#666',
+    color: THEME.colors.gray600,
   },
   frequencyGrid: {
     flexDirection: 'row',
@@ -896,12 +898,12 @@ const styles = StyleSheet.create({
   frequencyValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: THEME.colors.primary,
     marginBottom: 4,
   },
   frequencyLabel: {
     fontSize: 12,
-    color: '#666',
+    color: THEME.colors.gray600,
     textAlign: 'center',
   },
   footer: {
@@ -911,7 +913,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    color: '#999',
+    color: THEME.colors.gray500,
   },
   loadingContainer: {
     flex: 1,
@@ -921,7 +923,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginTop: 16,
     textAlign: 'center',
   },
@@ -934,31 +936,31 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#666',
+    color: THEME.colors.gray600,
     marginTop: 16,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: THEME.colors.gray500,
     textAlign: 'center',
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: THEME.colors.primary,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#fff',
+    color: THEME.colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -966,9 +968,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   modalContent: {
     flex: 1,

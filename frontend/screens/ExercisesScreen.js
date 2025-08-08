@@ -455,13 +455,13 @@ visible={showAddCustomModal}
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   loadingText: {
     marginTop: 10,
@@ -475,14 +475,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingTop: 60,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: THEME.colors.gray900,
   },
   addButton: {
     padding: 8,
@@ -490,13 +490,13 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     marginHorizontal: 16,
     marginVertical: 12,
     paddingHorizontal: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
   },
   searchIcon: {
     marginRight: 8,
@@ -505,14 +505,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#333',
+    color: THEME.colors.gray900,
   },
   categoryTabsContainer: {
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   categoryTabsWrapper: {
     flexDirection: 'row',
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderWidth: 1,
     borderColor: THEME.colors.primary,
     shadowColor: '#000',
@@ -540,6 +540,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
     height: 32,
+    minWidth: 44,
   },
   selectedCategoryTab: {
     backgroundColor: THEME.colors.primary,
@@ -561,7 +562,7 @@ const styles = StyleSheet.create({
   },
   noCategoriesText: {
     padding: 16,
-    color: '#999',
+    color: THEME.colors.gray500,
     fontSize: 16,
     textAlign: 'center',
   },
@@ -570,12 +571,12 @@ const styles = StyleSheet.create({
   },
   exerciseCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
   },
   exerciseInfo: {
     flex: 1,
@@ -588,17 +589,17 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: THEME.colors.gray900,
     flex: 1,
   },
   customBadge: {
-    backgroundColor: '#ff9500',
+    backgroundColor: THEME.colors.accent,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
   },
   customBadgeText: {
-    color: '#fff',
+    color: THEME.colors.white,
     fontSize: 10,
     fontWeight: '600',
   },
@@ -609,7 +610,7 @@ const styles = StyleSheet.create({
   },
   exerciseCategory: {
     fontSize: 12,
-    color: '#999',
+    color: THEME.colors.gray500,
     textTransform: 'uppercase',
     fontWeight: '500',
   },
@@ -622,7 +623,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f9ff',
+    backgroundColor: THEME.colors.infoLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -635,12 +636,12 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#999',
+    color: THEME.colors.gray500,
     textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: THEME.colors.gray100,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -649,14 +650,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     paddingTop: 60,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: THEME.colors.gray300,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
+    color: THEME.colors.gray900,
   },
   modalCancelButton: {
     fontSize: 16,
@@ -677,18 +678,18 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: THEME.colors.gray900,
     marginBottom: 8,
   },
   textInput: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#333',
+    color: THEME.colors.gray900,
   },
   textArea: {
     height: 100,
@@ -702,9 +703,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginRight: 8,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.white,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: THEME.colors.gray300,
   },
   selectedCategorySelectorItem: {
     backgroundColor: THEME.colors.primary,
@@ -716,7 +717,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   selectedCategorySelectorText: {
-    color: '#fff',
+    color: THEME.colors.white,
   },
   exerciseDetailSection: {
     marginBottom: 20,
@@ -724,7 +725,7 @@ const styles = StyleSheet.create({
   exerciseDetailLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: THEME.colors.gray900,
     marginBottom: 4,
   },
   exerciseDetailValue: {
@@ -734,7 +735,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: '#e9ecef',
+    backgroundColor: THEME.colors.gray300,
     marginLeft: 16, 
   },
 });
