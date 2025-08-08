@@ -13,8 +13,9 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import THEME from '../constants/theme';
 import { useWorkout } from '../contexts/WorkoutContext';
-import DatabaseManager from '../utils/database';
+import database from '../utils/firebaseDatabase';
 
 const ExercisesScreen = () => {
   const { 
@@ -58,11 +59,11 @@ const ExercisesScreen = () => {
       setLoading(true);
       
       // Ensure database is initialized
-      await DatabaseManager.initDatabase();
+      await database.initDatabase();
       
       const [exercisesData, categoriesData] = await Promise.all([
-        DatabaseManager.getExercises(),
-        DatabaseManager.getExerciseCategories()
+        database.getExercises(),
+        database.getExerciseCategories()
       ]);
       
       console.log('📊 Categories loaded:', categoriesData);
@@ -145,17 +146,15 @@ const ExercisesScreen = () => {
       const category = categories.find(cat => cat.name === customExercise.category);
       const categoryId = category ? category.id : categories[1]?.id; // Default to first real category
 
-      await DatabaseManager.runAsync(
-        'INSERT INTO exercises (name, category_id, muscle_groups, equipment, instructions, is_custom) VALUES (?, ?, ?, ?, ?, ?)',
-        [
-          customExercise.name,
-          categoryId,
-          customExercise.muscleGroups,
-          customExercise.equipment,
-          customExercise.instructions,
-          1
-        ]
-      );
+      // For Firebase, we'll add custom exercises to the exercises collection
+      await database.addCustomExercise({
+        name: customExercise.name,
+        categoryId,
+        muscle_groups: customExercise.muscleGroups,
+        equipment: customExercise.equipment,
+        instructions: customExercise.instructions,
+        is_custom: true
+      });
 
       // Reset form
       setCustomExercise({
@@ -224,7 +223,7 @@ const ExercisesScreen = () => {
           style={styles.actionButton}
           onPress={() => handleAddToWorkout(item)}
         >
-          <MaterialIcons name="add" size={24} color="#007AFF" />
+          <MaterialIcons name="add" size={24} color={THEME.colors.primary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -233,7 +232,7 @@ const ExercisesScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={THEME.colors.primary} />
         <Text style={styles.loadingText}>Loading exercises...</Text>
       </View>
     );
@@ -248,13 +247,13 @@ const ExercisesScreen = () => {
           style={styles.addButton}
           onPress={() => setShowAddCustomModal(true)}
         >
-          <MaterialIcons name="add" size={24} color="#007AFF" />
+          <MaterialIcons name="add" size={24} color={THEME.colors.primary} />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <MaterialIcons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <MaterialIcons name="search" size={20} color={THEME.colors.gray600} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search exercises..."
@@ -283,7 +282,7 @@ const ExercisesScreen = () => {
               <MaterialIcons
                 name={item.icon || 'fitness-center'}
                 size={14}
-                color={selectedCategory === item.name ? '#fff' : '#007AFF'}
+                color={selectedCategory === item.name ? THEME.colors.white : THEME.colors.primary}
                 style={styles.tabIcon}
               />
               <Text style={[
@@ -309,7 +308,7 @@ const ExercisesScreen = () => {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <MaterialIcons name="fitness-center" size={48} color="#ccc" />
+            <MaterialIcons name="fitness-center" size={48} color={THEME.colors.gray400} />
             <Text style={styles.emptyText}>
               {searchQuery ? 'No exercises found' : 'No exercises available'}
             </Text>
@@ -467,7 +466,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: THEME.colors.gray600,
   },
   header: {
     flexDirection: 'row',
@@ -531,7 +530,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: THEME.colors.primary,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -543,19 +542,19 @@ const styles = StyleSheet.create({
     height: 32,
   },
   selectedCategoryTab: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary,
   },
   categoryTabText: {
     marginLeft: 3,
     fontSize: 12,
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontWeight: '600',
     textAlign: 'center',
     flexShrink: 1,
   },
   selectedCategoryTabText: {
-    color: '#fff',
+    color: THEME.colors.white,
   },
   tabIcon: {
     // Icon styling handled in component
@@ -605,7 +604,7 @@ const styles = StyleSheet.create({
   },
   exerciseDetails: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     marginBottom: 2,
   },
   exerciseCategory: {
@@ -661,11 +660,11 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: {
     fontSize: 16,
-    color: '#666',
+    color: THEME.colors.gray600,
   },
   modalSaveButton: {
     fontSize: 16,
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontWeight: '600',
   },
   modalContent: {
@@ -708,12 +707,12 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
   },
   selectedCategorySelectorItem: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary,
   },
   categorySelectorText: {
     fontSize: 14,
-    color: '#666',
+    color: THEME.colors.gray600,
     fontWeight: '500',
   },
   selectedCategorySelectorText: {
@@ -730,7 +729,7 @@ const styles = StyleSheet.create({
   },
   exerciseDetailValue: {
     fontSize: 16,
-    color: '#666',
+    color: THEME.colors.gray600,
     lineHeight: 22,
   },
   separator: {

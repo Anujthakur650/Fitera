@@ -1,5 +1,5 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, Animated, View } from 'react-native';
+import React, { memo } from 'react';
+import { TouchableOpacity, Text, StyleSheet, Animated, View, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
 import THEME from '../constants/theme';
@@ -16,6 +16,9 @@ const EnhancedButton = ({
   loading = false,
   style,
   textStyle,
+  accessibilityLabel,
+  testID,
+  showSpinnerOnLoading = true,
   ...props
 }) => {
   const animatedValue = new Animated.Value(1);
@@ -79,9 +82,14 @@ const EnhancedButton = ({
           style={styles.iconLeft}
         />
       )}
-      <Text style={getTextStyle()}>
-        {loading ? 'Loading...' : title}
-      </Text>
+      {loading && showSpinnerOnLoading ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size={size === 'small' ? 'small' : 'small'} color={getIconColor()} />
+          <Text style={[getTextStyle(), styles.loadingText]}>{title}</Text>
+        </View>
+      ) : (
+        <Text style={getTextStyle()}>{title}</Text>
+      )}
       {icon && iconPosition === 'right' && (
         <MaterialIcons 
           name={icon} 
@@ -124,6 +132,11 @@ const EnhancedButton = ({
       onPressOut={handlePressOut}
       disabled={disabled || loading}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: disabled || loading }}
+      accessibilityLabel={accessibilityLabel || title}
+      testID={testID}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       {...props}
     >
       <Animated.View
@@ -250,6 +263,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginLeft: THEME.spacing.sm,
+  },
   iconLeft: {
     marginRight: THEME.spacing.sm,
   },
@@ -258,4 +279,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EnhancedButton; 
+export default memo(EnhancedButton);

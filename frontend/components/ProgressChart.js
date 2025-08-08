@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
 import THEME from '../constants/theme';
@@ -31,6 +31,9 @@ const ProgressChart = ({ data, title }) => {
         rulesColor={THEME.colors.gray700}
         dataPointsColor={THEME.colors.primary}
         curved
+        isAnimated
+        animateOnDataChange
+        showDataPointOnFocus
       />
     </View>
   );
@@ -60,4 +63,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProgressChart;
+export default memo(ProgressChart);

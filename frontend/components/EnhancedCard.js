@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import THEME from '../constants/theme';
@@ -44,6 +44,7 @@ const EnhancedCard = ({
         onPress={onPress}
         activeOpacity={0.8}
         style={styles.touchable}
+        accessibilityRole="button"
         {...props}
       >
         {cardContent}
@@ -105,4 +106,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EnhancedCard; 
+export default memo(EnhancedCard);
