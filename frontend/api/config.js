@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SecureStorage from '../utils/secureStorage';
 import NetworkSecurity from '../utils/networkSecurity';
 import APIRateLimiter from '../utils/apiRateLimiter';
 import ProductionConfig, { getAPIConfig } from '../config/production';
@@ -30,9 +31,11 @@ api.interceptors.request.use(
         throw new Error('HTTPS required for all API requests');
       }
       
-      const token = await AsyncStorage.getItem('token');
-      if (token) {
-        config.headers['Authorization'] = `Bearer ${token}`;
+      // Prefer secure storage; fall back to AsyncStorage for backward compatibility
+      const secureToken = await SecureStorage.getAuthToken();
+      const legacyToken = secureToken || (await AsyncStorage.getItem('token')) || (await AsyncStorage.getItem('userToken'));
+      if (legacyToken) {
+        config.headers['Authorization'] = `Bearer ${legacyToken}`;
       }
       
       // Security headers are already added from production config

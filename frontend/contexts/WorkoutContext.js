@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
-import DatabaseManager from '../utils/database';
+import database from '../utils/firebaseDatabase';
 import { useAuth } from './AuthContext';
 
 const WorkoutContext = createContext();
@@ -189,12 +189,12 @@ export const WorkoutProvider = ({ children }) => {
   // Initialize database on app start
   useEffect(() => {
     const initDB = async () => {
-      const success = await DatabaseManager.initDatabase();
+      const success = await database.initDatabase();
       dispatch({ type: 'INIT_DATABASE', payload: success });
       
       if (success && user) {
         // Check for active workout for the current user
-        const activeWorkout = await DatabaseManager.getActiveWorkout(getCurrentUserId());
+        const activeWorkout = await database.getActiveWorkout(getCurrentUserId());
         if (activeWorkout) {
           dispatch({ type: 'SET_ACTIVE_WORKOUT', payload: activeWorkout });
           loadWorkoutData(activeWorkout.id);
@@ -238,12 +238,12 @@ export const WorkoutProvider = ({ children }) => {
 
   const loadWorkoutData = async (workoutId) => {
     try {
-      const exercises = await DatabaseManager.getWorkoutExercises(workoutId);
+      const exercises = await database.getWorkoutExercises(workoutId);
       dispatch({ type: 'SET_WORKOUT_EXERCISES', payload: exercises });
 
       // Load sets for each exercise
       for (const exercise of exercises) {
-        const sets = await DatabaseManager.getSets(exercise.id);
+        const sets = await database.getSets(workoutId, exercise.id);
         dispatch({
           type: 'UPDATE_EXERCISE_SETS',
           exerciseId: exercise.id,
@@ -265,23 +265,22 @@ export const WorkoutProvider = ({ children }) => {
       }
       
       const startTime = new Date().toISOString();
-      const workoutId = await DatabaseManager.createWorkout(name, templateId, userId);
+      const workoutId = await database.createWorkout(name, templateId, userId);
       const newWorkout = { id: workoutId, name, date: startTime };
 
       let exercises = [];
       let sets = {};
 
       if (templateId) {
-        const templateExercises = await DatabaseManager.getAllAsync(
-          'SELECT exercise_id FROM workout_template_exercises WHERE template_id = ?',
-          [templateId]
-        );
-
-        const exerciseDetailsPromises = templateExercises.map(row =>
-          DatabaseManager.getFirstAsync('SELECT * FROM exercises WHERE id = ?', [row.exercise_id])
-        );
-
-        exercises = await Promise.all(exerciseDetailsPromises);
+        // For Firebase, fetch template exercises and normalize payload
+        const templateExercises = await database.getTemplateExercises(templateId);
+        // Map template exercise items to the state shape; no undefined variables
+        exercises = (templateExercises || []).map((ex, index) => ({
+          id: ex.id || `${templateId}_${index}`,
+          exercise_id: ex.exerciseId || ex.id,
+          exercise_name: ex.name || ex.exerciseName || 'Exercise',
+          order_index: index
+        }));
 
         exercises.forEach(ex => {
           if (ex) sets[ex.id] = [];
@@ -309,7 +308,7 @@ export const WorkoutProvider = ({ children }) => {
 
     try {
       const orderIndex = state.workoutExercises.length;
-      const workoutExerciseId = await DatabaseManager.addExerciseToWorkout(
+      const workoutExerciseId = await database.addExerciseToWorkout(
         state.activeWorkout.id,
         exerciseId,
         orderIndex
@@ -333,7 +332,14 @@ export const WorkoutProvider = ({ children }) => {
   const addSet = async (workoutExerciseId, weight, reps, isWarmup = false) => {
     try {
       const setNumber = (state.exerciseSets[workoutExerciseId]?.length || 0) + 1;
-      const setId = await DatabaseManager.addSet(workoutExerciseId, setNumber, weight, reps, isWarmup);
+      const setData = {
+        set_number: setNumber,
+        weight,
+        reps,
+        is_warmup: isWarmup,
+        is_completed: true
+      };
+      const setId = await database.addSet(state.activeWorkout.id, workoutExerciseId, setData);
       
       const newSet = {
         id: setId,
@@ -359,7 +365,7 @@ export const WorkoutProvider = ({ children }) => {
 
   const updateSet = async (workoutExerciseId, setId, weight, reps) => {
     try {
-      await DatabaseManager.updateSet(setId, weight, reps);
+      await database.updateSet(state.activeWorkout.id, workoutExerciseId, setId, { weight, reps });
       dispatch({
         type: 'UPDATE_SET',
         exerciseId: workoutExerciseId,
@@ -373,7 +379,7 @@ export const WorkoutProvider = ({ children }) => {
 
   const deleteSet = async (workoutExerciseId, setId) => {
     try {
-      await DatabaseManager.deleteSet(setId);
+      await database.deleteSet(state.activeWorkout.id, workoutExerciseId, setId);
       dispatch({
         type: 'DELETE_SET',
         exerciseId: workoutExerciseId,
@@ -388,7 +394,7 @@ export const WorkoutProvider = ({ children }) => {
     if (!state.activeWorkout) return;
 
     try {
-      await DatabaseManager.completeWorkout(state.activeWorkout.id, state.timer.duration);
+      await database.finishWorkout(state.activeWorkout.id, state.timer.duration);
       dispatch({ type: 'COMPLETE_WORKOUT' });
     } catch (error) {
       console.error('Error completing workout:', error);

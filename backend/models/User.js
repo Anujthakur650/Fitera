@@ -20,7 +20,8 @@ const UserSchema = new mongoose.Schema({
 
 // Pre-save hook for hashing password
 UserSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) next();
+  // Prevent double-hashing: if password wasn't modified, continue without rehashing
+  if (!this.isModified('password')) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
