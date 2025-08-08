@@ -41,12 +41,14 @@ export const AuthProvider = ({ children }) => {
             photoURL: firebaseUser.photoURL,
           };
           
-          // Store user data locally
-          await AsyncStorage.setItem('user', JSON.stringify(userData));
-          setUser(userData);
+      // Store user data locally
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+      setUser(userData);
           
-          // Migrate user data to local database if needed
-          await migrateUserToLocalDB(userData);
+          // Prewarm progress stats cache in background to speed up Home
+          import('../utils/firebaseDatabase').then(async (mod) => {
+            try { await mod.default.getUserStats(userData.id); } catch (_) {}
+          });
         } else {
           // User is signed out
           setUser(null);

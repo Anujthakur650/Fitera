@@ -41,6 +41,9 @@ const HomeScreen = ({ navigation }) => {
   });
   const [isNewUser, setIsNewUser] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [isRecentLoading, setIsRecentLoading] = useState(true);
+  const [isTemplatesLoading, setIsTemplatesLoading] = useState(true);
   const [error, setError] = useState(null);
   
 
@@ -79,43 +82,26 @@ const HomeScreen = ({ navigation }) => {
     }
 
     setIsLoading(true);
+    setIsStatsLoading(true);
+    setIsRecentLoading(true);
+    setIsTemplatesLoading(true);
     try {
-      const userId = user.id; // Get current user ID - no fallback
-      
-      // Load recent workouts for current user
-      const recent = await database.getRecentWorkouts(userId, 5);
-      setRecentWorkouts(recent);
-      
-      // Debug: Log recent workouts data
-      console.log(`HomeScreen - Recent workouts loaded: ${recent.length}`);
-      recent.forEach((w, i) => {
-        console.log(`  ${i + 1}. ${w.name} - Exercises: ${w.exercise_count}, Sets: ${w.set_count}`);
-      });
+      const userId = user.id;
 
-      // Load workout templates
-      const templates = await database.getTemplates(userId);
-      setWorkoutTemplates(templates);
+      // Start all requests but resolve independently so stats can render first
+      const statsPromise = database.getUserStats(userId)
+        .then((s) => setStats(s))
+        .finally(() => setIsStatsLoading(false));
 
-      // Calculate stats for current user
-      const allWorkouts = await database.getWorkoutHistory(userId, 1000);
-      
-      const thisWeek = getThisWeekWorkouts(allWorkouts);
-      const totalVolume = await calculateTotalVolume(allWorkouts);
-      const favoriteExercise = await getFavoriteExercise(userId);
-      
-      console.log('Loading stats for user:', userId, {
-        totalWorkouts: allWorkouts.length,
-        thisWeekWorkouts: thisWeek.length,
-        totalVolume,
-        favoriteExercise
-      });
-      
-      setStats({
-        totalWorkouts: allWorkouts.length,
-        thisWeekWorkouts: thisWeek.length,
-        totalVolume,
-        favoriteExercise
-      });
+      const recentPromise = database.getRecentWorkouts(userId, 5)
+        .then((r) => setRecentWorkouts(r))
+        .finally(() => setIsRecentLoading(false));
+
+      const templatesPromise = database.getTemplates(userId)
+        .then((t) => setWorkoutTemplates(t))
+        .finally(() => setIsTemplatesLoading(false));
+
+      await Promise.allSettled([statsPromise, recentPromise, templatesPromise]);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       setError('Could not load dashboard data. Please try again.');
@@ -315,7 +301,7 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.statsContainer}>
       <Text style={styles.sectionTitle}>Your Progress</Text>
       
-      {isLoading ? (
+      {isStatsLoading ? (
         <View style={styles.statsGrid}>
           {renderStatSkeleton()}
           {renderStatSkeleton()}

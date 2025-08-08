@@ -12,7 +12,8 @@ import {
   deleteDoc,
   addDoc,
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  getCountFromServer
 } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import ErrorHandler from './errorHandler';
@@ -60,11 +61,6 @@ class FirebaseDatabase {
       // Ensure Firebase auth bridge is ready before DB operations
       const isReady = await this.authBridge.ensureFirebaseAuth();
       if (!isReady) {
-        // In development, allow guarded fallback to keep app usable without blocking
-        if (__DEV__) {
-          console.warn('⚠️ Firebase Auth not ready; continuing in dev mode without auth');
-          return true; // Backward-compat for development only
-        }
         console.warn('⚠️ Firebase Auth not ready for database operations');
         return false;
       }
@@ -80,13 +76,7 @@ class FirebaseDatabase {
    */
   getAuthenticatedUserId() {
     // Use Firebase UID supplied by the auth bridge
-    const uid = this.authBridge.getFirestoreUserId();
-    if (!uid && __DEV__) {
-      // Guarded dev fallback to avoid hard crash during local testing
-      console.warn('⚠️ No authenticated Firebase user; dev fallback user will be used');
-      return 'dev-fallback-user';
-    }
-    return uid;
+    return this.authBridge.getFirestoreUserId();
   }
 
   // Cache management
@@ -213,17 +203,36 @@ class FirebaseDatabase {
       const cached = this.getCachedData(cacheKey);
       if (cached) return cached;
 
-      let exercisesQuery = collection(db, 'exercises');
-      
-      if (categoryId && categoryId !== 'all') {
-        exercisesQuery = query(exercisesQuery, where('categoryId', '==', categoryId));
+      // Read from public master list first
+      let exercisesQuery = query(collection(db, 'exercises'), orderBy('name'));
+      const exercisesSnapshot = await getDocs(exercisesQuery);
+
+      let exercises = exercisesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      // Optional: include user-specific custom exercises from a user subcollection
+      const uid = this.getAuthenticatedUserId();
+      if (uid) {
+        try {
+          const userExercisesSnap = await getDocs(
+            query(collection(db, 'users', uid, 'exercises'), orderBy('name'))
+          );
+          const userExercises = userExercisesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          exercises = [...exercises, ...userExercises];
+        } catch (e) {
+          // Ignore if user subcollection doesn't exist or permissions restrict access
+        }
       }
       
-      exercisesQuery = query(exercisesQuery, orderBy('name'));
-      const exercisesSnapshot = await getDocs(exercisesQuery);
+      // Filter by category if provided (client-side to avoid index requirements)
+      if (categoryId && categoryId !== 'all') {
+        exercises = exercises.filter(ex => ex.categoryId === categoryId || ex.category === categoryId);
+      }
       
-      const exercises = exercisesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
+      // If no exercises found, return defaults to avoid empty UI
+      if (!exercises || exercises.length === 0) {
+        exercises = this.getDefaultExercises();
+      }
+
       // Cache for longer since exercises don't change often
       this.setCachedData(cacheKey, exercises, 30 * 60 * 1000); // 30 minutes
       
@@ -280,14 +289,182 @@ class FirebaseDatabase {
     }
   }
 
+  async addExerciseToWorkout(workoutId, exerciseId, orderIndex = 0, exerciseName = null) {
+    try {
+      const exerciseData = {
+        exerciseId,
+        exerciseName: exerciseName || null,
+        order_index: orderIndex,
+        createdAt: serverTimestamp(),
+      };
+      const exerciseRef = await addDoc(collection(db, 'workouts', workoutId, 'exercises'), exerciseData);
+      return exerciseRef.id;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'addExerciseToWorkout' }, 'HIGH');
+      throw error;
+    }
+  }
+
+  async addSet(workoutId, workoutExerciseId, setData) {
+    try {
+      const setRef = await addDoc(collection(db, 'workouts', workoutId, 'exercises', workoutExerciseId, 'sets'), {
+        ...setData,
+        createdAt: serverTimestamp()
+      });
+      return setRef.id;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'addSet' }, 'HIGH');
+      throw error;
+    }
+  }
+
+  /**
+   * Get all workout exercises for a workout (Firebase subcollection)
+   */
+  async getWorkoutExercises(workoutId) {
+    try {
+      const exercisesSnapshot = await getDocs(
+        query(collection(db, 'workouts', workoutId, 'exercises'), orderBy('order_index'))
+      );
+      return exercisesSnapshot.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id, // workout exercise id used by contexts
+          exercise_id: data.exerciseId || null,
+          exercise_name: data.exerciseName || 'Exercise',
+          order_index: data.order_index ?? 0,
+        };
+      });
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'getWorkoutExercises' }, 'HIGH');
+      return [];
+    }
+  }
+
+  /**
+   * Get all sets for a workout exercise
+   */
+  async getSets(workoutId, workoutExerciseId) {
+    try {
+      const setsSnapshot = await getDocs(
+        query(collection(db, 'workouts', workoutId, 'exercises', workoutExerciseId, 'sets'), orderBy('set_number'))
+      );
+      return setsSnapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'getSets' }, 'HIGH');
+      return [];
+    }
+  }
+
+  /**
+   * Get detailed workout info (exercises + sets), enriched with basic exercise metadata
+   */
+  async getWorkoutDetails(workoutId) {
+    try {
+      const exerciseMetaCache = new Map();
+      const fetchExerciseMeta = async (exerciseId) => {
+        if (!exerciseId) return { muscle_groups: '', category_name: '' };
+        if (exerciseMetaCache.has(exerciseId)) return exerciseMetaCache.get(exerciseId);
+        try {
+          const exDoc = await getDoc(doc(db, 'exercises', exerciseId));
+          const data = exDoc.exists() ? exDoc.data() : {};
+          const meta = {
+            muscle_groups: data.muscle_groups || '',
+            category_name: data.category || data.category_name || '',
+          };
+          exerciseMetaCache.set(exerciseId, meta);
+          return meta;
+        } catch (_) {
+          return { muscle_groups: '', category_name: '' };
+        }
+      };
+
+      const workoutExercises = await this.getWorkoutExercises(workoutId);
+      const results = [];
+      for (const ex of workoutExercises) {
+        const sets = await this.getSets(workoutId, ex.id);
+        const meta = await fetchExerciseMeta(ex.exercise_id);
+        results.push({
+          workout_exercise_id: ex.id,
+          exercise_id: ex.exercise_id,
+          exercise_name: ex.exercise_name,
+          muscle_groups: meta.muscle_groups,
+          category_name: meta.category_name,
+          sets,
+        });
+      }
+      return results;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'getWorkoutDetails' }, 'HIGH');
+      return [];
+    }
+  }
+
+  /**
+   * Delete a workout and all nested subcollections (exercises and sets)
+   */
+  async deleteWorkout(workoutId, userId) {
+    try {
+      // Delete sets and exercises first
+      const exercisesSnap = await getDocs(collection(db, 'workouts', workoutId, 'exercises'));
+      for (const exDoc of exercisesSnap.docs) {
+        const setsSnap = await getDocs(collection(db, 'workouts', workoutId, 'exercises', exDoc.id, 'sets'));
+        for (const setDoc of setsSnap.docs) {
+          await deleteDoc(doc(db, 'workouts', workoutId, 'exercises', exDoc.id, 'sets', setDoc.id));
+        }
+        await deleteDoc(doc(db, 'workouts', workoutId, 'exercises', exDoc.id));
+      }
+      // Delete the workout document
+      await deleteDoc(doc(db, 'workouts', workoutId));
+
+      // Invalidate caches for this user
+      if (userId) {
+        this.invalidateCache(`workout_history_${userId}`);
+        this.invalidateCache(`workout_stats_${userId}`);
+        this.invalidateCache(`active_workout_${userId}`);
+      }
+      return true;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'deleteWorkout' }, 'HIGH');
+      throw error;
+    }
+  }
+
+  /**
+   * Delete selected workouts by IDs
+   */
+  async deleteSelectedWorkouts(workoutIds = [], userId) {
+    for (const id of workoutIds) {
+      try {
+        await this.deleteWorkout(id, userId);
+      } catch (e) {
+        // continue on error; caller will show partial failure
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Delete all workouts for a user
+   */
+  async deleteAllWorkouts(userId) {
+    try {
+      const snap = await getDocs(query(collection(db, 'workouts'), where('userId', '==', userId)));
+      for (const wDoc of snap.docs) {
+        await this.deleteWorkout(wDoc.id, userId);
+      }
+      return true;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'deleteAllWorkouts' }, 'HIGH');
+      throw error;
+    }
+  }
+
   async getActiveWorkout(userId) {
     try {
-      // Ensure Firebase Auth is ready
+      // Require authenticated user
       const isAuthenticated = await this.ensureAuthentication();
-      if (!isAuthenticated) {
-        console.warn('⚠️ Cannot get active workout: Firebase Auth not ready');
-        return null;
-      }
+      if (!isAuthenticated) return null;
 
       const cacheKey = `active_workout_${userId}`;
       const cached = this.getCachedData(cacheKey);
@@ -295,10 +472,7 @@ class FirebaseDatabase {
 
       // Use authenticated user ID for Firestore query
       const authenticatedUserId = this.getAuthenticatedUserId();
-      if (!authenticatedUserId) {
-        console.warn('⚠️ No authenticated user ID available for getActiveWorkout');
-        return null;
-      }
+      if (!authenticatedUserId) return null;
 
       // Use a simpler query to avoid index requirements
       const workoutsSnapshot = await getDocs(
@@ -365,12 +539,9 @@ class FirebaseDatabase {
   // Optimized workout history with pagination
   async getWorkoutHistory(userId, limitCount = 50) {
     try {
-      // Ensure Firebase Auth is ready
+      // Require authenticated user
       const isAuthenticated = await this.ensureAuthentication();
-      if (!isAuthenticated) {
-        console.warn('⚠️ Cannot get workout history: Firebase Auth not ready');
-        return [];
-      }
+      if (!isAuthenticated) return [];
 
       const cacheKey = `workout_history_${userId}_${limitCount}`;
       const cached = this.getCachedData(cacheKey);
@@ -378,10 +549,7 @@ class FirebaseDatabase {
 
       // Use authenticated user ID for Firestore query
       const authenticatedUserId = this.getAuthenticatedUserId();
-      if (!authenticatedUserId) {
-        console.warn('⚠️ No authenticated user ID available for getWorkoutHistory');
-        return [];
-      }
+      if (!authenticatedUserId) return [];
 
       const workoutsSnapshot = await getDocs(
         query(
@@ -396,6 +564,8 @@ class FirebaseDatabase {
       const workouts = [];
       for (const workoutDoc of workoutsSnapshot.docs) {
         const workoutData = workoutDoc.data();
+        const created = workoutData.createdAt?.toDate?.() || new Date(workoutData.createdAt || workoutData.date || 0);
+        const dateISO = created instanceof Date && !isNaN(created) ? created.toISOString() : null;
         
         // Get exercise count and set count efficiently
         const exercisesSnapshot = await getDocs(collection(db, 'workouts', workoutDoc.id, 'exercises'));
@@ -418,6 +588,8 @@ class FirebaseDatabase {
         workouts.push({
           id: workoutDoc.id,
           ...workoutData,
+          // Normalize date to an ISO string for UI helpers expecting strings
+          date: dateISO,
           exercise_count: exercisesSnapshot.size,
           set_count: totalSets,
           total_volume: totalVolume
@@ -435,29 +607,75 @@ class FirebaseDatabase {
   }
 
   async getRecentWorkouts(userId, limitCount = 5) {
-    return await this.getWorkoutHistory(userId, limitCount);
+    try {
+      const cacheKey = `recent_workouts_${userId}_${limitCount}`;
+      const cached = this.getCachedData(cacheKey);
+      if (cached) return cached;
+
+      // Lightweight list: no subcollection reads
+      const recentSnap = await getDocs(
+        query(
+          collection(db, 'workouts'),
+          where('userId', '==', userId),
+          where('isCompleted', '==', true),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        )
+      );
+
+      const items = recentSnap.docs.map(docSnap => {
+        const w = docSnap.data();
+        const created = w.createdAt?.toDate?.() || new Date(w.createdAt || 0);
+        return {
+          id: docSnap.id,
+          name: w.name || 'Workout',
+          date: created instanceof Date && !isNaN(created) ? created.toISOString() : null,
+          duration: w.duration || 0,
+          total_volume: typeof w.totalVolume === 'number' ? w.totalVolume : 0,
+          // optional precomputed counts if present; do not fetch subcollections here
+          exercise_count: w.exerciseCount || 0,
+          set_count: w.setCount || 0,
+        };
+      });
+
+      this.setCachedData(cacheKey, items, 5 * 60 * 1000);
+      return items;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'getRecentWorkouts' }, 'MEDIUM');
+      return [];
+    }
   }
 
-  // Optimized user progress stats (replaces multiple individual queries)
+  // Optimized user progress stats (fast, low-IO)
   async getUserProgressStats(userId) {
     try {
       const cacheKey = `progress_stats_${userId}`;
       const cached = this.getCachedData(cacheKey);
       if (cached) return cached;
 
-      // Get all completed workouts for comprehensive stats
-      const workoutsSnapshot = await getDocs(
+      // 1) Count completed workouts using aggregation (no document reads)
+      const countSnap = await getCountFromServer(
+        query(
+          collection(db, 'workouts'),
+          where('userId', '==', userId),
+          where('isCompleted', '==', true)
+        )
+      );
+      const totalWorkouts = countSnap.data().count || 0;
+
+      // 2) Fetch limited recent workouts to derive thisWeek + favoriteExercise quickly
+      const recentWorkoutsSnap = await getDocs(
         query(
           collection(db, 'workouts'),
           where('userId', '==', userId),
           where('isCompleted', '==', true),
-          orderBy('date', 'desc')
+          orderBy('createdAt', 'desc'),
+          limit(30) // enough to compute weekly stats and top exercise without heavy IO
         )
       );
 
-      let totalWorkouts = workoutsSnapshot.size;
-      let totalVolume = 0;
       let thisWeekWorkouts = 0;
+      let totalVolume = 0;
       const exerciseFrequency = new Map();
 
       const now = new Date();
@@ -465,43 +683,36 @@ class FirebaseDatabase {
       weekStart.setDate(now.getDate() - now.getDay());
       weekStart.setHours(0, 0, 0, 0);
 
-      for (const workoutDoc of workoutsSnapshot.docs) {
+      // Iterate recent workouts only
+      for (const workoutDoc of recentWorkoutsSnap.docs) {
         const workoutData = workoutDoc.data();
-        const workoutDate = workoutData.date?.toDate() || new Date(workoutData.date);
+        const created = workoutData.createdAt?.toDate?.() || new Date(workoutData.createdAt || 0);
+        if (created >= weekStart) thisWeekWorkouts++;
 
-        // Count this week's workouts
-        if (workoutDate >= weekStart) {
-          thisWeekWorkouts++;
+        // Prefer persisted total volume if available (written on finish)
+        if (typeof workoutData.totalVolume === 'number') {
+          totalVolume += workoutData.totalVolume;
+          continue; // no need to read subcollections
         }
 
-        // Get exercises and calculate volume
-        const exercisesSnapshot = await getDocs(collection(db, 'workouts', workoutDoc.id, 'exercises'));
-        
-        for (const exerciseDoc of exercisesSnapshot.docs) {
-          const exerciseData = exerciseDoc.data();
-          
-          // Track exercise frequency
-          const exerciseName = exerciseData.exerciseName || exerciseData.name || 'Unknown';
-          exerciseFrequency.set(exerciseName, (exerciseFrequency.get(exerciseName) || 0) + 1);
-
-          // Calculate volume
-          const setsSnapshot = await getDocs(collection(db, 'workouts', workoutDoc.id, 'exercises', exerciseDoc.id, 'sets'));
-          setsSnapshot.docs.forEach(setDoc => {
-            const setData = setDoc.data();
-            if (setData.weight && setData.reps) {
-              totalVolume += setData.weight * setData.reps;
-            }
-          });
-        }
+        // Fallback: read only exercises (not sets) to compute favorite quickly
+        const exercisesSnap = await getDocs(collection(db, 'workouts', workoutDoc.id, 'exercises'));
+        exercisesSnap.docs.forEach(exDoc => {
+          const ex = exDoc.data();
+          const name = ex.exerciseName || ex.name || 'Unknown';
+          exerciseFrequency.set(name, (exerciseFrequency.get(name) || 0) + 1);
+        });
       }
 
-      // Find favorite exercise
+      // If we still need favoriteExercise and frequency map is empty, default gracefully
       let favoriteExercise = 'None';
-      let maxFrequency = 0;
-      for (const [exercise, frequency] of exerciseFrequency) {
-        if (frequency > maxFrequency) {
-          maxFrequency = frequency;
-          favoriteExercise = exercise;
+      if (exerciseFrequency.size > 0) {
+        let max = 0;
+        for (const [name, freq] of exerciseFrequency) {
+          if (freq > max) {
+            max = freq;
+            favoriteExercise = name;
+          }
         }
       }
 
@@ -512,18 +723,11 @@ class FirebaseDatabase {
         favoriteExercise
       };
 
-      // Cache for 15 minutes
       this.setCachedData(cacheKey, stats);
-      
       return stats;
     } catch (error) {
       ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'getUserProgressStats' }, 'HIGH');
-      return {
-        totalWorkouts: 0,
-        thisWeekWorkouts: 0,
-        totalVolume: 0,
-        favoriteExercise: 'None'
-      };
+      return { totalWorkouts: 0, thisWeekWorkouts: 0, totalVolume: 0, favoriteExercise: 'None' };
     }
   }
 
@@ -668,7 +872,7 @@ class FirebaseDatabase {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
       
       const recentWorkouts = workouts.filter(workout => {
-        const workoutDate = workout.createdAt?.toDate() || new Date(workout.createdAt);
+        const workoutDate = workout.createdAt?.toDate?.() || new Date(workout.createdAt);
         return workoutDate >= thirtyDaysAgo;
       });
 
@@ -700,10 +904,25 @@ class FirebaseDatabase {
   async finishWorkout(workoutId, duration) {
     try {
       const workoutRef = doc(db, 'workouts', workoutId);
+
+      // Compute total volume once when finishing to speed up future stats
+      let totalVolume = 0;
+      try {
+        const exercisesSnap = await getDocs(collection(db, 'workouts', workoutId, 'exercises'));
+        for (const ex of exercisesSnap.docs) {
+          const setsSnap = await getDocs(collection(db, 'workouts', workoutId, 'exercises', ex.id, 'sets'));
+          setsSnap.docs.forEach(snap => {
+            const s = snap.data();
+            if (s.is_completed && s.weight && s.reps) totalVolume += s.weight * s.reps;
+          });
+        }
+      } catch (_) {}
+
       await updateDoc(workoutRef, {
         isCompleted: true,
         completedAt: serverTimestamp(),
         duration: duration || 0,
+        totalVolume: Math.round(totalVolume),
         updatedAt: serverTimestamp()
       });
 
