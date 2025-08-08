@@ -295,7 +295,7 @@ const ProfileScreen = ({ navigation }) => {
     <View style={styles.profileSection}>
       <View style={styles.avatarContainer}>
         <View style={styles.avatar}>
-          <MaterialIcons name="person" size={40} color="#007AFF" />
+          <MaterialIcons name="person" size={40} color={THEME.colors.primary} />
         </View>
       </View>
       <Text style={styles.userName}>{userProfile.name}</Text>
@@ -304,7 +304,7 @@ const ProfileScreen = ({ navigation }) => {
         style={styles.editProfileButton}
         onPress={() => setShowEditProfileModal(true)}
       >
-        <MaterialIcons name="edit" size={16} color="#007AFF" />
+        <MaterialIcons name="edit" size={16} color={THEME.colors.primary} />
         <Text style={styles.editProfileText}>Edit Profile</Text>
       </TouchableOpacity>
     </View>
@@ -336,12 +336,12 @@ const ProfileScreen = ({ navigation }) => {
 
   const renderSettingsItem = (icon, title, subtitle, onPress, rightElement = null) => (
     <TouchableOpacity style={styles.settingsItem} onPress={onPress}>
-      <MaterialIcons name={icon} size={24} color="#666" style={styles.settingsIcon} />
+      <MaterialIcons name={icon} size={24} color={THEME.colors.gray600} style={styles.settingsIcon} />
       <View style={styles.settingsContent}>
         <Text style={styles.settingsTitle}>{title}</Text>
         {subtitle && <Text style={styles.settingsSubtitle}>{subtitle}</Text>}
       </View>
-      {rightElement || <MaterialIcons name="chevron-right" size={24} color="#ccc" />}
+      {rightElement || <MaterialIcons name="chevron-right" size={24} color={THEME.colors.gray400} />}
     </TouchableOpacity>
   );
 
@@ -379,8 +379,8 @@ const ProfileScreen = ({ navigation }) => {
             <Switch
               value={appSettings.notifications}
               onValueChange={(value) => setAppSettings({...appSettings, notifications: value})}
-              trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
-              thumbColor="#fff"
+              trackColor={{ false: THEME.colors.gray300, true: THEME.colors.primary }}
+              thumbColor={THEME.colors.white}
             />
           )}
           {renderSettingsItem(
@@ -391,8 +391,8 @@ const ProfileScreen = ({ navigation }) => {
             <Switch
               value={appSettings.soundEffects}
               onValueChange={(value) => setAppSettings({...appSettings, soundEffects: value})}
-              trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
-              thumbColor="#fff"
+              trackColor={{ false: THEME.colors.gray300, true: THEME.colors.primary }}
+              thumbColor={THEME.colors.white}
             />
           )}
           {renderSettingsItem(
@@ -403,8 +403,8 @@ const ProfileScreen = ({ navigation }) => {
             <Switch
               value={appSettings.vibrations}
               onValueChange={(value) => setAppSettings({...appSettings, vibrations: value})}
-              trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
-              thumbColor="#fff"
+              trackColor={{ false: THEME.colors.gray300, true: THEME.colors.primary }}
+              thumbColor={THEME.colors.white}
             />
           )}
           {renderSettingsItem(
@@ -415,8 +415,8 @@ const ProfileScreen = ({ navigation }) => {
             <Switch
               value={appSettings.autoRestTimer}
               onValueChange={(value) => setAppSettings({...appSettings, autoRestTimer: value})}
-              trackColor={{ false: '#e0e0e0', true: '#007AFF' }}
-              thumbColor="#fff"
+              trackColor={{ false: THEME.colors.gray300, true: THEME.colors.primary }}
+              thumbColor={THEME.colors.white}
             />
           )}
           {renderSettingsItem(
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#007AFF',
+    borderColor: THEME.colors.primary,
   },
   userName: {
     fontSize: 24,
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
   editProfileText: {
     marginLeft: 6,
     fontSize: 14,
-    color: '#007AFF',
+    color: THEME.colors.primary,
     fontWeight: '500',
   },
   statsSection: {
@@ -773,7 +773,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: THEME.colors.primary,
     marginBottom: 4,
   },
   statLabel: {

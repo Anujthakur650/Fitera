@@ -382,7 +382,7 @@ const HomeScreen = ({ navigation }) => {
                 <Text style={styles.workoutHistoryDuration}>
                   Duration: {formatTime(item.duration)}
                 </Text>
-                <Icon name="chevron-right" size={20} color="#999" />
+                 <Icon name="chevron-right" size={20} color={THEME.colors.gray400} />
               </View>
             </TouchableOpacity>
           )}
@@ -640,24 +640,24 @@ const styles = StyleSheet.create({
     letterSpacing: THEME.typography.letterSpacing.wide,
   },
   recentWorkoutsContainer: {
-    marginHorizontal: 20,
-    marginBottom: 24,
+    marginHorizontal: THEME.spacing.xl,
+    marginBottom: THEME.spacing['2xl'],
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: THEME.spacing.md,
   },
   seeAllText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: THEME.colors.primary,
+    fontSize: THEME.typography.fontSize.base,
+    fontWeight: THEME.typography.fontWeight.semibold,
   },
   emptyState: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 32,
+    backgroundColor: THEME.colors.white,
+    borderRadius: THEME.radius.xl,
+    padding: THEME.spacing['2xl'],
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -666,22 +666,22 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#999',
-    marginTop: 12,
+    fontSize: THEME.typography.fontSize.lg,
+    fontWeight: THEME.typography.fontWeight.semibold,
+    color: THEME.colors.gray500,
+    marginTop: THEME.spacing.md,
   },
   emptyStateSubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 4,
+    fontSize: THEME.typography.fontSize.sm,
+    color: THEME.colors.gray600,
+    marginTop: THEME.spacing.xs,
     textAlign: 'center',
   },
   workoutHistoryItem: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
+    backgroundColor: THEME.colors.white,
+    padding: THEME.spacing.lg,
+    borderRadius: THEME.radius.lg,
+    marginBottom: THEME.spacing.sm,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -695,23 +695,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   workoutHistoryName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontSize: THEME.typography.fontSize.base,
+    fontWeight: THEME.typography.fontWeight.semibold,
+    color: THEME.colors.gray900,
   },
   workoutHistoryDate: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    fontSize: THEME.typography.fontSize.sm,
+    color: THEME.colors.gray600,
+    marginTop: THEME.spacing.xs,
   },
   workoutHistoryRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: THEME.spacing.xs,
   },
   workoutHistoryDuration: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: THEME.typography.fontSize.sm,
+    color: THEME.colors.gray600,
   },
   modalContainer: {
     flex: 1,

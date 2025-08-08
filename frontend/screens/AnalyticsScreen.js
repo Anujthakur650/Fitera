@@ -125,7 +125,7 @@ const AnalyticsScreen = () => {
             <View style={styles.scoreItem}>
               <Text style={styles.scoreLabel}>Balance</Text>
               <View style={styles.scoreBar}>
-                <View style={[styles.scoreBarFill, { width: `${breakdown.muscleBalance}%`, backgroundColor: '#007AFF' }]} />
+                <View style={[styles.scoreBarFill, { width: `${breakdown.muscleBalance}%`, backgroundColor: THEME.colors.primary }]} />
               </View>
               <Text style={styles.scoreValue}>{breakdown.muscleBalance}%</Text>
             </View>
