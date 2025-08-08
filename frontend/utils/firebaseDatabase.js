@@ -319,6 +319,35 @@ class FirebaseDatabase {
   }
 
   /**
+   * Update a set under a workout exercise
+   */
+  async updateSet(workoutId, workoutExerciseId, setId, updates) {
+    try {
+      await updateDoc(doc(db, 'workouts', workoutId, 'exercises', workoutExerciseId, 'sets', setId), {
+        ...updates,
+        updatedAt: serverTimestamp()
+      });
+      return true;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'updateSet' }, 'HIGH');
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a set under a workout exercise
+   */
+  async deleteSet(workoutId, workoutExerciseId, setId) {
+    try {
+      await deleteDoc(doc(db, 'workouts', workoutId, 'exercises', workoutExerciseId, 'sets', setId));
+      return true;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'deleteSet' }, 'HIGH');
+      throw error;
+    }
+  }
+
+  /**
    * Get all workout exercises for a workout (Firebase subcollection)
    */
   async getWorkoutExercises(workoutId) {
@@ -642,6 +671,51 @@ class FirebaseDatabase {
       return items;
     } catch (error) {
       ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'getRecentWorkouts' }, 'MEDIUM');
+      return [];
+    }
+  }
+
+  /**
+   * Add a custom exercise for the current user into users/{uid}/exercises
+   * Firestore rules allow only owner writes there.
+   */
+  async addCustomExercise(exercise) {
+    try {
+      const uid = this.getAuthenticatedUserId();
+      if (!uid) {
+        throw new Error('Not authenticated');
+      }
+      const payload = {
+        name: exercise.name,
+        categoryId: exercise.categoryId || exercise.category_id || null,
+        category: exercise.category || null,
+        muscle_groups: exercise.muscle_groups || '',
+        equipment: exercise.equipment || '',
+        instructions: exercise.instructions || '',
+        is_custom: true,
+        createdAt: serverTimestamp(),
+      };
+      const ref = await addDoc(collection(db, 'users', uid, 'exercises'), payload);
+      // Invalidate exercises cache
+      this.invalidateCache('exercises_');
+      return ref.id;
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'addCustomExercise' }, 'HIGH');
+      throw error;
+    }
+  }
+
+  /**
+   * Fetch exercises for a template. Store under templates/{templateId}/exercises.
+   */
+  async getTemplateExercises(templateId) {
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'templates', templateId, 'exercises'), orderBy('order_index'))
+      );
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (error) {
+      ErrorHandler.logError(error, { screen: 'FirebaseDatabase', action: 'getTemplateExercises' }, 'MEDIUM');
       return [];
     }
   }

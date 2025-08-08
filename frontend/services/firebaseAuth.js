@@ -31,14 +31,6 @@ export const signUpWithEmail = async (email, password, username) => {
       displayName: username
     });
 
-    // Store additional user data if needed
-    await AsyncStorage.setItem('userData', JSON.stringify({
-      uid: user.uid,
-      email: user.email,
-      username: username,
-      emailVerified: user.emailVerified,
-    }));
-
     return {
       success: true,
       user: {
@@ -65,14 +57,6 @@ export const signInWithEmail = async (email, password) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
 
-    // Store user data
-    await AsyncStorage.setItem('userData', JSON.stringify({
-      uid: user.uid,
-      email: user.email,
-      username: user.displayName,
-      emailVerified: user.emailVerified,
-    }));
-
     return {
       success: true,
       user: {
@@ -95,7 +79,6 @@ export const signInWithEmail = async (email, password) => {
 export const signOut = async () => {
   try {
     await firebaseSignOut(auth);
-    await AsyncStorage.removeItem('userData');
     return { success: true };
   } catch (error) {
     console.error('Sign out error:', error);
@@ -155,14 +138,6 @@ export const updateUserProfile = async (updates) => {
     if (user) {
       await updateProfile(user, updates);
       
-      // Update stored data
-      const userData = await AsyncStorage.getItem('userData');
-      if (userData) {
-        const parsedData = JSON.parse(userData);
-        const updatedData = { ...parsedData, ...updates };
-        await AsyncStorage.setItem('userData', JSON.stringify(updatedData));
-      }
-      
       return { success: true };
     } else {
       return {
@@ -185,7 +160,6 @@ export const deleteUserAccount = async () => {
     const user = auth.currentUser;
     if (user) {
       await user.delete();
-      await AsyncStorage.removeItem('userData');
       return { success: true };
     } else {
       return {

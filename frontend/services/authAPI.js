@@ -133,14 +133,12 @@ export const logoutUser = async () => {
     
     // Clear local storage
     await AsyncStorage.removeItem('userToken');
-    await AsyncStorage.removeItem('userData');
     
     return { success: true };
   } catch (error) {
     console.error('Logout error:', error);
     // Still clear local storage even if API call fails
     await AsyncStorage.removeItem('userToken');
-    await AsyncStorage.removeItem('userData');
     throw error;
   }
 };
