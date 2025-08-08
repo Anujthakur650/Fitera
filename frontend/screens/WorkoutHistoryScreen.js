@@ -287,6 +287,9 @@ const WorkoutHistoryScreen = ({ navigation }) => {
         styles.filterButton,
         selectedFilter === filter && styles.filterButtonActive
       ]}
+      accessibilityRole="button"
+      accessibilityState={{ selected: selectedFilter === filter }}
+      accessibilityLabel={`Filter: ${label}`}
       onPress={() => setSelectedFilter(filter)}
     >
       <Text style={[
@@ -308,6 +311,8 @@ const WorkoutHistoryScreen = ({ navigation }) => {
     return (
       <TouchableOpacity
         style={styles.deleteAction}
+        accessibilityRole="button"
+        accessibilityLabel={`Delete workout ${item.name}`}
         onPress={() => {
           Alert.alert(
             'Delete Workout',
