@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import THEME from '../constants/theme';
 import EnhancedButton from '../components/EnhancedButton';
 import EnhancedCard from '../components/EnhancedCard';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/FirebaseAuthContext';
 
 export default function ForgotPasswordEmailScreen({ navigation }) {
   const [email, setEmail] = useState('');

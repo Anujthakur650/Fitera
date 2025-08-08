@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useWorkout } from '../contexts/WorkoutContext';
-import { useAuth } from '../contexts/AuthContext';
-import AnalyticsEngine from '../utils/analyticsEngine';
+import { useAuth } from '../contexts/FirebaseAuthContext';
+import analyticsEngine from '../utils/firebaseAnalytics';
 // Removed DataDebugComponent for production
 
 const { width } = Dimensions.get('window');
@@ -38,10 +38,10 @@ const AnalyticsScreen = () => {
   ];
 
   useEffect(() => {
-    if (state.dbInitialized && user?.id) {
+    if (state?.dbInitialized && user?.id) {
       loadAnalytics();
     }
-  }, [state.dbInitialized, selectedTimeframe, user?.id]);
+  }, [state?.dbInitialized, selectedTimeframe, user?.id]);
 
   const loadAnalytics = async () => {
     try {
@@ -50,7 +50,7 @@ const AnalyticsScreen = () => {
         return;
       }
       setLoading(true);
-      const analyticsData = await AnalyticsEngine.getComprehensiveAnalytics(user.id, selectedTimeframe);
+      const analyticsData = await analyticsEngine.getComprehensiveAnalytics(user.id, selectedTimeframe);
       setAnalytics(analyticsData);
     } catch (error) {
       console.error('Error loading analytics:', error);
@@ -173,7 +173,7 @@ const AnalyticsScreen = () => {
         </View>
 
         <View style={styles.balanceContainer}>
-          {balance.slice(0, 4).map((group, index) => (
+          {balance && balance.slice(0, 4).map((group, index) => (
             <View key={index} style={styles.balanceItem}>
               <Text style={styles.balanceLabel}>{group.muscleGroup}</Text>
               <View style={styles.balanceBar}>
@@ -192,7 +192,7 @@ const AnalyticsScreen = () => {
           ))}
         </View>
 
-        {imbalances.length > 0 && (
+        {imbalances && imbalances.length > 0 && (
           <View style={styles.imbalanceAlert}>
             <MaterialIcons name="warning" size={16} color="#ff9500" />
             <Text style={styles.imbalanceText}>
@@ -201,7 +201,7 @@ const AnalyticsScreen = () => {
           </View>
         )}
 
-        {recommendations.length > 0 && (
+        {recommendations && recommendations.length > 0 && (
           <View style={styles.recommendationBox}>
             <Text style={styles.recommendationTitle}>Recommendations:</Text>
             {recommendations.slice(0, 2).map((rec, index) => (
@@ -358,7 +358,7 @@ const AnalyticsScreen = () => {
           </View>
         </View>
 
-        {recommendations.length > 0 && (
+        {recommendations && recommendations.length > 0 && (
           <View style={styles.recommendationBox}>
             <Text style={styles.recommendationTitle}>Frequency Tips:</Text>
             {recommendations.slice(0, 2).map((rec, index) => (

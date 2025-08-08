@@ -14,14 +14,14 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useWorkout } from '../contexts/WorkoutContext';
-import { useAuth } from '../contexts/AuthContext';
-import DatabaseManager from '../utils/database';
+import { useAuth } from '../contexts/FirebaseAuthContext';
+import database from '../utils/firebaseDatabase';
 import THEME from '../constants/theme';
 import EnhancedButton from '../components/EnhancedButton';
 import EnhancedCard from '../components/EnhancedCard';
 import { useFocusEffect } from '@react-navigation/native';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
   const { state } = useWorkout();
   const { user, logout } = useAuth();
   const [userProfile, setUserProfile] = useState({
@@ -70,19 +70,16 @@ const ProfileScreen = () => {
 
   const loadUserData = async () => {
     try {
-      await DatabaseManager.initDatabase();
-      // Load user profile from database, prioritizing authenticated user data
-      const users = await DatabaseManager.getAllAsync('SELECT * FROM users LIMIT 1');
-      if (users.length > 0) {
+      const userData = await database.getUserProfile(user.id);
+      if (userData) {
         setUserProfile({
-          name: user?.username || user?.name || users[0].name || 'Fitera User',
-          email: user?.email || users[0].email || '',
-          weight: users[0].weight || '',
-          height: users[0].height || '',
-          memberSince: users[0].created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
+          name: user?.username || user?.name || userData.name || 'Fitera User',
+          email: user?.email || userData.email || '',
+          weight: userData.weight || '',
+          height: userData.height || '',
+          memberSince: userData.created_at?.split('T')[0] || new Date().toISOString().split('T')[0]
         });
       } else {
-        // If no local data, use authenticated user data
         setUserProfile({
           name: user?.username || user?.name || 'Fitera User',
           email: user?.email || '',
@@ -112,49 +109,25 @@ const ProfileScreen = () => {
       const userId = user.id; // Get current user ID - no fallback
       
       // Get total completed workouts for current user
-      const totalWorkouts = await DatabaseManager.getFirstAsync(
-        'SELECT COUNT(*) as count FROM workouts WHERE is_completed = 1 AND user_id = ?',
-        [userId]
-      );
+      const stats = await database.getWorkoutStats(userId);
 
-      // Get total volume (sets * weight * reps) for current user
-      const volumeResult = await DatabaseManager.getFirstAsync(
-        `SELECT SUM(s.weight * s.reps) as volume 
-         FROM sets s 
-         JOIN workout_exercises we ON s.workout_exercise_id = we.id 
-         JOIN workouts w ON we.workout_id = w.id
-         WHERE s.is_completed = 1 AND w.user_id = ?`,
-        [userId]
-      );
-
-      // Get unique exercises performed by current user
-      const prResult = await DatabaseManager.getFirstAsync(
-        `SELECT COUNT(DISTINCT we.exercise_id) as count 
-         FROM sets s 
-         JOIN workout_exercises we ON s.workout_exercise_id = we.id 
-         JOIN workouts w ON we.workout_id = w.id
-         WHERE s.is_completed = 1 AND w.user_id = ?`,
-        [userId]
-      );
-
-      // Get average workout duration for current user
-      const avgDuration = await DatabaseManager.getFirstAsync(
-        'SELECT AVG(duration) as avg FROM workouts WHERE is_completed = 1 AND duration > 0 AND user_id = ?',
-        [userId]
-      );
+      const totalWorkouts = stats.totalWorkouts || 0;
+      const totalVolume = Math.round(stats.totalVolume || 0);
+      const personalRecords = stats.personalRecords || 0;
+      const averageWorkoutTime = Math.round(stats.averageWorkoutTime || 0);
 
       console.log('Loading workout stats for user:', userId, {
-        totalWorkouts: totalWorkouts?.count || 0,
-        totalVolume: Math.round(volumeResult?.volume || 0),
-        personalRecords: prResult?.count || 0,
-        averageWorkoutTime: Math.round(avgDuration?.avg || 0)
+        totalWorkouts,
+        totalVolume,
+        personalRecords,
+        averageWorkoutTime
       });
 
       setWorkoutStats({
-        totalWorkouts: totalWorkouts?.count || 0,
-        totalVolume: Math.round(volumeResult?.volume || 0),
-        personalRecords: prResult?.count || 0,
-        averageWorkoutTime: Math.round(avgDuration?.avg || 0)
+        totalWorkouts,
+        totalVolume,
+        personalRecords,
+        averageWorkoutTime
       });
     } catch (error) {
       console.error('Error loading workout stats:', error);
@@ -164,19 +137,7 @@ const ProfileScreen = () => {
   const saveUserProfile = async () => {
     try {
       // Update or insert user profile
-      const existingUser = await DatabaseManager.getFirstAsync('SELECT * FROM users LIMIT 1');
-      
-      if (existingUser) {
-        await DatabaseManager.runAsync(
-          'UPDATE users SET name = ?, email = ?, weight = ?, height = ? WHERE id = ?',
-          [userProfile.name, userProfile.email, userProfile.weight, userProfile.height, existingUser.id]
-        );
-      } else {
-        await DatabaseManager.runAsync(
-          'INSERT INTO users (name, email, weight, height) VALUES (?, ?, ?, ?)',
-          [userProfile.name, userProfile.email, userProfile.weight, userProfile.height]
-        );
-      }
+      await database.saveUserProfile(user.id, userProfile);
 
       setShowEditProfileModal(false);
       Alert.alert('Success', 'Profile updated successfully!');
@@ -193,10 +154,7 @@ const ProfileScreen = () => {
     }
 
     try {
-      await DatabaseManager.runAsync(
-        'INSERT INTO body_measurements (measurement_type, value, unit, date, notes) VALUES (?, ?, ?, ?, ?)',
-        [bodyMeasurement.type, parseFloat(bodyMeasurement.value), bodyMeasurement.unit, bodyMeasurement.date, bodyMeasurement.notes]
-      );
+      await database.saveBodyMeasurement(user.id, bodyMeasurement);
 
       setBodyMeasurement({
         type: 'weight',
@@ -236,53 +194,10 @@ const ProfileScreen = () => {
               };
 
               // Get all workouts
-              const workouts = await DatabaseManager.getAllAsync(
-                'SELECT * FROM workouts WHERE user_id = ? ORDER BY date DESC',
-                [userId]
-              );
-
-              // Get exercises and sets for each workout
-              for (const workout of workouts) {
-                const workoutData = { ...workout, exercises: [] };
-                
-                // Get exercises for this workout
-                const exercises = await DatabaseManager.getAllAsync(`
-                  SELECT we.*, e.name as exercise_name, e.muscle_groups 
-                  FROM workout_exercises we 
-                  JOIN exercises e ON we.exercise_id = e.id 
-                  WHERE we.workout_id = ? 
-                  ORDER BY we.order_index
-                `, [workout.id]);
-
-                // Get sets for each exercise
-                for (const exercise of exercises) {
-                  const sets = await DatabaseManager.getAllAsync(
-                    'SELECT * FROM sets WHERE workout_exercise_id = ? ORDER BY set_number',
-                    [exercise.id]
-                  );
-                  workoutData.exercises.push({
-                    ...exercise,
-                    sets: sets
-                  });
-                }
-                
-                userData.workouts.push(workoutData);
-              }
-
-              // Get all exercises used
-              userData.exercises = await DatabaseManager.getAllAsync(`
-                SELECT DISTINCT e.* 
-                FROM exercises e
-                JOIN workout_exercises we ON e.id = we.exercise_id
-                JOIN workouts w ON we.workout_id = w.id
-                WHERE w.user_id = ?
-              `, [userId]);
-
-              // Get body measurements
-              userData.bodyMeasurements = await DatabaseManager.getAllAsync(
-                'SELECT * FROM body_measurements WHERE user_id = ? ORDER BY date DESC',
-                [userId]
-              );
+              const workoutData = await database.getUserExportData(userId);
+              userData.workouts = workoutData.workouts;
+              userData.exercises = workoutData.exercises;
+              userData.bodyMeasurements = workoutData.bodyMeasurements;
 
               // Convert to JSON string
               const jsonData = JSON.stringify(userData, null, 2);
@@ -331,31 +246,7 @@ const ProfileScreen = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Delete only current user's data with proper user isolation
-              // First delete sets that belong to workout exercises of user's workouts
-              await DatabaseManager.runAsync(
-                `DELETE FROM sets WHERE workout_exercise_id IN (
-                  SELECT we.id FROM workout_exercises we 
-                  JOIN workouts w ON we.workout_id = w.id 
-                  WHERE w.user_id = ?
-                )`,
-                [user.id]
-              );
-              
-              // Then delete workout exercises
-              await DatabaseManager.runAsync(
-                'DELETE FROM workout_exercises WHERE workout_id IN (SELECT id FROM workouts WHERE user_id = ?)',
-                [user.id]
-              );
-              
-              // Delete workouts
-              await DatabaseManager.runAsync('DELETE FROM workouts WHERE user_id = ?', [user.id]);
-              
-              // Delete body measurements
-              await DatabaseManager.runAsync('DELETE FROM body_measurements WHERE user_id = ?', [user.id]);
-              
-              // Delete personal records
-              await DatabaseManager.runAsync('DELETE FROM personal_records WHERE user_id = ?', [user.id]);
+              await database.clearUserData(user.id);
               
               await loadWorkoutStats();
               Alert.alert('Success', 'Your data has been cleared successfully');
@@ -555,6 +446,13 @@ const ProfileScreen = () => {
             'Clear All Data',
             'Delete all workouts and progress',
             clearAllData
+          )}
+          {/* Temporary option for populating exercises */}
+          {renderSettingsItem(
+            'fitness-center',
+            'Populate Exercises',
+            'Add sample exercises to database',
+            () => navigation.navigate('PopulateExercises')
           )}
         </View>
 

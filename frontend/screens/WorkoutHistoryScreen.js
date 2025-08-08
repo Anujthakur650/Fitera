@@ -17,8 +17,8 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useWorkout } from '../contexts/WorkoutContext';
-import { useAuth } from '../contexts/AuthContext';
-import DatabaseManager from '../utils/database';
+import { useAuth } from '../contexts/FirebaseAuthContext';
+import database from '../utils/firebaseDatabase';
 import THEME from '../constants/theme';
 import { getRelativeTime, formatDateShort } from '../utils/dateFormatter';
 import { parseSQLiteDate } from '../utils/dateFormatter';
@@ -48,8 +48,7 @@ const WorkoutHistoryScreen = ({ navigation }) => {
 
   const fixWorkoutNames = async () => {
     try {
-      // Force re-run the migration to fix any workout name/date mismatches
-      await DatabaseManager.migrateWorkoutNaming();
+      await database.migrateWorkoutNaming(user.id);
     } catch (error) {
       console.error('Error fixing workout names:', error);
     }
@@ -66,8 +65,7 @@ const WorkoutHistoryScreen = ({ navigation }) => {
       setLoading(true);
       const userId = user.id;
       
-      // Load all workouts with exercises and sets (now filtered at database level)
-      const allWorkouts = await DatabaseManager.getWorkoutHistory(userId, 1000);
+      const allWorkouts = await database.getWorkoutHistory(userId, 1000);
       
       // Apply filter based on selected time period
       let filteredWorkouts = allWorkouts;
@@ -156,45 +154,7 @@ const WorkoutHistoryScreen = ({ navigation }) => {
     setDetailsLoading(true);
     try {
       // Get all exercises for this workout
-      const exercises = await DatabaseManager.getAllAsync(`
-        SELECT 
-          we.id as workout_exercise_id,
-          we.order_index,
-          we.notes as exercise_notes,
-          e.id as exercise_id,
-          e.name as exercise_name,
-          e.muscle_groups,
-          ec.name as category_name
-        FROM workout_exercises we
-        JOIN exercises e ON we.exercise_id = e.id
-        LEFT JOIN exercise_categories ec ON e.category_id = ec.id
-        WHERE we.workout_id = ?
-        ORDER BY we.order_index
-      `, [workout.id]);
-
-      // Get all sets for each exercise
-      const exercisesWithSets = await Promise.all(
-        exercises.map(async (exercise) => {
-          const sets = await DatabaseManager.getAllAsync(`
-            SELECT 
-              s.id,
-              s.set_number,
-              s.weight,
-              s.reps,
-              s.is_warmup,
-              s.is_completed,
-              s.notes
-            FROM sets s
-            WHERE s.workout_exercise_id = ?
-            ORDER BY s.set_number
-          `, [exercise.workout_exercise_id]);
-
-          return {
-            ...exercise,
-            sets: sets
-          };
-        })
-      );
+      const exercisesWithSets = await database.getWorkoutDetails(workout.id);
 
       // Calculate workout statistics
       let totalSets = 0;
@@ -220,7 +180,7 @@ const WorkoutHistoryScreen = ({ navigation }) => {
         ...workout,
         exercises: exercisesWithSets,
         stats: {
-          totalExercises: exercises.length,
+          totalExercises: exercisesWithSets.length,
           totalSets,
           completedSets,
           totalVolume: Math.round(totalVolume),
@@ -256,7 +216,7 @@ const WorkoutHistoryScreen = ({ navigation }) => {
 
   const deleteWorkout = async (workoutId) => {
     try {
-      await DatabaseManager.deleteWorkout(workoutId, user.id);
+      await database.deleteWorkout(workoutId, user.id);
       await loadWorkouts();
       Alert.alert('Success', 'Workout deleted successfully');
     } catch (error) {
@@ -276,9 +236,7 @@ const WorkoutHistoryScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              for (const workoutId of selectedWorkouts) {
-                await DatabaseManager.deleteWorkout(workoutId, user.id);
-              }
+              await database.deleteSelectedWorkouts(Array.from(selectedWorkouts), user.id);
               setSelectedWorkouts(new Set());
               setIsEditMode(false);
               await loadWorkouts();
@@ -304,10 +262,7 @@ const WorkoutHistoryScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Delete all workouts for current user
-              for (const workout of workouts) {
-                await DatabaseManager.deleteWorkout(workout.id, user.id);
-              }
+              await database.deleteAllWorkouts(user.id);
               setIsEditMode(false);
               await loadWorkouts();
               Alert.alert('Success', 'All workouts deleted successfully');

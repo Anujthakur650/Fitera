@@ -9,7 +9,6 @@ import {
   getCurrentUser,
   sendPasswordResetEmail 
 } from '../services/firebaseAuth';
-import DatabaseManager from '../utils/database';
 import ErrorHandler from '../utils/errorHandler';
 import SecurityAudit from '../utils/securityAudit';
 import RateLimiter from '../utils/rateLimiter';
@@ -65,30 +64,8 @@ export const AuthProvider = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  // Migrate user data to local database for fitness data association
-  const migrateUserToLocalDB = async (userData) => {
-    try {
-      await DatabaseManager.initDatabase();
-      
-      // Check if user exists in local database
-      const existingUsers = await DatabaseManager.getAllAsync(
-        'SELECT * FROM users WHERE id = ? OR email = LOWER(?) LIMIT 1', 
-        [userData.uid, userData.email]
-      );
-      
-      if (existingUsers.length === 0) {
-        // Create user in local database with Firebase UID as ID
-        await DatabaseManager.runAsync(
-          'INSERT INTO users (id, name, email, created_at) VALUES (?, ?, ?, ?)',
-          [userData.uid, userData.username, userData.email, new Date().toISOString()]
-        );
-        console.log('✅ User migrated to local database');
-      }
-    } catch (error) {
-      console.error('Error migrating user to local DB:', error);
-      // Non-critical error, don't block the user
-    }
-  };
+  // No-op: local database migration removed for Firebase-only auth
+  const migrateUserToLocalDB = async () => { return true; };
 
   const login = async (email, password) => {
     try {

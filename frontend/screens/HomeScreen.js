@@ -16,8 +16,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWorkout } from '../contexts/WorkoutContext';
-import { useAuth } from '../contexts/AuthContext';
-import DatabaseManager from '../utils/database';
+import { useAuth } from '../contexts/FirebaseAuthContext';
+import database from '../utils/firebaseDatabase';
 import { formatDate } from '../utils/dateUtils';
 import { formatDateShort, formatWorkoutDate, getRelativeTime } from '../utils/dateFormatter';
 import THEME from '../constants/theme';
@@ -83,7 +83,7 @@ const HomeScreen = ({ navigation }) => {
       const userId = user.id; // Get current user ID - no fallback
       
       // Load recent workouts for current user
-      const recent = await DatabaseManager.getRecentWorkouts(userId, 5);
+      const recent = await database.getRecentWorkouts(userId, 5);
       setRecentWorkouts(recent);
       
       // Debug: Log recent workouts data
@@ -93,11 +93,11 @@ const HomeScreen = ({ navigation }) => {
       });
 
       // Load workout templates
-      const templates = await DatabaseManager.getWorkoutTemplates();
+      const templates = await database.getTemplates(userId);
       setWorkoutTemplates(templates);
 
       // Calculate stats for current user
-      const allWorkouts = await DatabaseManager.getWorkoutHistory(userId, 1000);
+      const allWorkouts = await database.getWorkoutHistory(userId, 1000);
       
       const thisWeek = getThisWeekWorkouts(allWorkouts);
       const totalVolume = await calculateTotalVolume(allWorkouts);
@@ -132,19 +132,10 @@ const HomeScreen = ({ navigation }) => {
 
   const calculateTotalVolume = async (workouts) => {
     try {
+      // Total volume is already calculated in getWorkoutHistory for Firebase
       let totalVolume = 0;
       for (const workout of workouts) {
-        // Calculate volume from sets (weight * reps)
-        const sets = await DatabaseManager.getAllAsync(
-          `SELECT s.weight, s.reps FROM sets s 
-           JOIN workout_exercises we ON s.workout_exercise_id = we.id 
-           WHERE we.workout_id = ? AND s.is_completed = 1`,
-          [workout.id]
-        );
-        
-        for (const set of sets) {
-          totalVolume += (set.weight || 0) * (set.reps || 0);
-        }
+        totalVolume += workout.total_volume || 0;
       }
       return Math.round(totalVolume);
     } catch (error) {
@@ -155,19 +146,9 @@ const HomeScreen = ({ navigation }) => {
 
   const getFavoriteExercise = async (userId) => {
     try {
-      // Get the most frequently used exercise for current user
-      const result = await DatabaseManager.getFirstAsync(
-        `SELECT e.name, COUNT(*) as count 
-         FROM workout_exercises we 
-         JOIN exercises e ON we.exercise_id = e.id 
-         JOIN workouts w ON we.workout_id = w.id
-         WHERE w.user_id = ?
-         GROUP BY e.id, e.name 
-         ORDER BY count DESC 
-         LIMIT 1`,
-        [userId]
-      );
-      return result?.name || 'None';
+      // For Firebase, we'll use the getUserStats method which already calculates favorite exercise
+      const stats = await database.getUserStats(userId);
+      return stats.favoriteExercise || 'None';
     } catch (error) {
       console.error('Error getting favorite exercise:', error);
       return 'None';
@@ -178,17 +159,10 @@ const HomeScreen = ({ navigation }) => {
     if (!user?.id) return;
     
     try {
-      const newUserStatus = await DatabaseManager.isNewUser(user.id);
-      setIsNewUser(newUserStatus);
-      
-      // If user has completed at least one workout, mark them as returning
-      if (newUserStatus) {
-        const workouts = await DatabaseManager.getWorkoutHistory(user.id, 1);
-        if (workouts.length > 0) {
-          await DatabaseManager.markUserAsReturning(user.id);
-          setIsNewUser(false);
-        }
-      }
+      // For Firebase, check if user has any workouts
+      const workouts = await database.getWorkoutHistory(user.id, 1);
+      const userIsNew = workouts.length === 0;
+      setIsNewUser(userIsNew);
     } catch (error) {
       console.error('Error checking new user status:', error);
     }

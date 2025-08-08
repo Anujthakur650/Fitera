@@ -6,12 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { WorkoutProvider } from './contexts/WorkoutContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import THEME from './constants/theme';
-import LoadingSpinner from './components/LoadingSpinner';
-
-// Import security system
-import SecurityMigrationManager from './utils/securityMigration';
+import { AuthProvider, useAuth } from './contexts/FirebaseAuthContext';
 
 // Import main app screens
 import HomeScreen from './screens/HomeScreen';
@@ -20,8 +15,9 @@ import ExercisesScreen from './screens/ExercisesScreen';
 import AnalyticsScreen from './screens/AnalyticsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import WorkoutHistoryScreen from './screens/WorkoutHistoryScreen';
+import PopulateExercisesScreen from './screens/PopulateExercisesScreen';
 
-// Import authentication screens
+// Import auth screens
 import WelcomeScreen from './screens/WelcomeScreen';
 import LoginScreen from './screens/LoginScreen';
 import RegisterScreen from './screens/RegisterScreen';
@@ -29,6 +25,11 @@ import ForgotPasswordEmailScreen from './screens/ForgotPasswordEmailScreen';
 import ForgotPasswordSentScreen from './screens/ForgotPasswordSentScreen';
 import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import PasswordResetSuccessScreen from './screens/PasswordResetSuccessScreen';
+
+// Import components and utilities
+import LoadingSpinner from './components/LoadingSpinner';
+import THEME from './constants/theme';
+import SecurityMigrationManager from './utils/securityMigration';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -54,6 +55,16 @@ function HomeStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeScreen" component={HomeScreen} />
       <Stack.Screen name="WorkoutHistory" component={WorkoutHistoryScreen} />
+    </Stack.Navigator>
+  );
+}
+
+// Stack navigator for Profile
+function ProfileStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+      <Stack.Screen name="PopulateExercises" component={PopulateExercisesScreen} />
     </Stack.Navigator>
   );
 }
@@ -116,7 +127,7 @@ function MainTabs() {
       <Tab.Screen name="Workout" component={WorkoutScreen} />
       <Tab.Screen name="Exercises" component={ExercisesScreen} />
       <Tab.Screen name="Analytics" component={AnalyticsScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Profile" component={ProfileStack} />
     </Tab.Navigator>
   );
 }

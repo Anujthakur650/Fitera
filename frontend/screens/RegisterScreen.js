@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/FirebaseAuthContext';
 import THEME from '../constants/theme';
 import EnhancedButton from '../components/EnhancedButton';
 import EnhancedCard from '../components/EnhancedCard';
